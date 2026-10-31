@@ -268,3 +268,176 @@ html, body {
   animation: blink 1s steps(2) infinite;
 }
 @keyframes blink { 50% { opacity: .35; } }
+
+/* =========================================================
+ * Construction toolbar (bottom)
+ * ========================================================= */
+#toolbar {
+  flex: 0 0 auto;
+  position: relative;
+  padding: 6px max(6px, env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+  border-top: 2px solid #000;
+  box-shadow:
+    inset 0 2px 0 var(--ui-hi2),
+    inset 0 4px 0 var(--ui-mid),
+    0 -3px 0 rgba(0, 0, 0, .35);
+  z-index: 10;
+}
+
+/* Tool tray: a sunken shelf of tool cards, scrolls sideways on phones */
+#tray {
+  margin-bottom: 5px;
+  background: #140d06;
+  border: 2px solid;
+  border-color: var(--ui-black) var(--ui-hi) var(--ui-hi) var(--ui-black);
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, .55);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+#tray::-webkit-scrollbar { display: none; }
+#tray[hidden] { display: none; }
+
+#tray-items {
+  display: flex;
+  gap: 5px;
+  padding: 5px;
+  width: max-content;
+  min-width: 100%;
+}
+
+.tool {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  width: 74px;
+  height: 70px;
+  padding: 4px 2px 3px;
+  font-family: var(--font);
+  color: var(--ink);
+  background-color: var(--ui-mid);
+  background-image: linear-gradient(rgba(255, 225, 170, .2), rgba(0, 0, 0, .15)), var(--wood-tex);
+  background-size: auto, 256px 256px;
+  border: 2px solid;
+  border-color: var(--ui-hi2) var(--ui-lo) var(--ui-lo) var(--ui-hi2);
+  box-shadow: 0 0 0 1px #000;
+  cursor: pointer;
+  touch-action: manipulation;
+  image-rendering: pixelated;
+}
+.tool img {
+  height: 32px;
+  width: auto;
+  max-width: 64px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, .6));
+}
+.tool .tool-name {
+  font-size: 6px;
+  line-height: 1.3;
+  text-align: center;
+  text-shadow: 1px 1px 0 #000;
+}
+.tool .tool-price {
+  font-size: 7px;
+  color: var(--cash);
+  text-shadow: 1px 1px 0 #000;
+}
+.tool:active,
+.tool.on {
+  border-color: var(--ui-lo) var(--ui-hi2) var(--ui-hi2) var(--ui-lo);
+  background-image: linear-gradient(rgba(0, 0, 0, .3), rgba(0, 0, 0, .12)), var(--wood-tex);
+}
+.tool.on { box-shadow: 0 0 0 1px #000, 0 0 0 3px var(--gold); }
+.tool.on .tool-name { color: var(--gold); }
+.tool.disabled .tool-price { color: #e05a4a; }
+
+/* Non-interactive stat card (guests) */
+.tool.info {
+  cursor: default;
+  justify-content: center;
+  gap: 5px;
+  background: #1d140a;
+  border-color: var(--ui-black) var(--ui-hi) var(--ui-hi) var(--ui-black);
+}
+.tool.info .big { font-size: 13px; color: var(--gold); text-shadow: 1px 1px 0 #000; }
+
+/* Tabs */
+#tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+}
+.tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 38px;
+  padding: 0 4px;
+  font-family: var(--font);
+  font-size: 7px;
+  color: var(--ink);
+  text-shadow: 1px 1px 0 #000;
+  background-color: var(--ui-face);
+  background-image: linear-gradient(rgba(255, 225, 170, .12), rgba(0, 0, 0, .2)), var(--wood-tex);
+  background-size: auto, 256px 256px;
+  border: 2px solid;
+  border-color: var(--ui-hi2) var(--ui-lo) var(--ui-lo) var(--ui-hi2);
+  box-shadow: 0 0 0 1px #000;
+  cursor: pointer;
+  touch-action: manipulation;
+  image-rendering: pixelated;
+}
+.tab svg { width: 18px; height: 18px; flex: 0 0 auto; filter: drop-shadow(1px 1px 0 #000); }
+.tab.on {
+  color: var(--gold);
+  border-color: var(--ui-lo) var(--ui-hi2) var(--ui-hi2) var(--ui-lo);
+  background-image: linear-gradient(rgba(0, 0, 0, .35), rgba(0, 0, 0, .15)), var(--wood-tex);
+}
+@media (max-width: 380px) {
+  .tab span { display: none; }
+  .tab svg { width: 22px; height: 22px; }
+}
+
+/* Hint / message banner */
+#hint {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  max-width: calc(100% - 20px);
+  padding: 4px;
+  border: 2px solid;
+  border-color: var(--ui-hi2) var(--ui-lo) var(--ui-lo) var(--ui-hi2);
+  box-shadow: 0 0 0 2px #000, 3px 3px 0 rgba(0, 0, 0, .45);
+  z-index: 6;
+}
+#hint[hidden] { display: none; }
+#hint .inset {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  font-size: 7px;
+  line-height: 1.6;
+  color: var(--gold);
+  text-shadow: 1px 1px 0 #000;
+}
+#hint.error .inset { color: #ff7a5c; }
+#hint.good .inset { color: var(--cash); }
+.btn-sm { width: 30px; height: auto; min-height: 30px; }
+.btn-sm svg { width: 14px; height: 14px; }
+
+/* Shorter side panel on small screens now that the toolbar takes space */
+@media (max-height: 700px) {
+  .btn { width: 40px; height: 40px; }
+  .btn svg { width: 22px; height: 22px; }
+  #side-panel { gap: 4px; padding: 6px 5px; }
+}

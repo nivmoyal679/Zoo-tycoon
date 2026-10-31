@@ -87,11 +87,62 @@
         </button>
       </nav>
 
+      <div id="hint" class="wood" hidden>
+        <div class="inset" id="hint-text"></div>
+        <button class="btn btn-sm" id="hint-cancel" aria-label="Cancel tool" title="Cancel">
+          <svg viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
+            <path d="M3 2h2v1h1v1h1v1h2V4h1V3h1V2h2v2h-1v1h-1v1h-1v1h-1v2h1v1h1v1h1v1h1v2h-2v-1h-1v-1h-1v-1H9v-1H7v1H6v1H5v1H4v1H2v-2h1v-1h1v-1h1V9h1V7H5V6H4V5H3V4H2V2z" fill="currentColor"/>
+          </svg>
+        </button>
+      </div>
+
       <div id="tile-info" class="wood" hidden><div class="inset" id="tile-info-text"></div></div>
       <div id="loading"><div class="wood loading-box"><div class="inset">GENERATING TERRAIN...</div></div></div>
     </main>
+
+    <!-- Construction toolbar -->
+    <footer id="toolbar" class="wood">
+      <div id="tray"><div id="tray-items"></div></div>
+      <div id="tabs" role="tablist">
+        <button class="tab" data-tab="terrain" role="tab">
+          <svg viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
+            <path d="M8 3h2v1h2v1h2v1h2v2h-2v1h-2v1h-2v1H8v-1H6V9H4V8H2V7H0V6h2V5h2V4h2V3z" fill="#5aa037"/>
+            <path d="M0 7h2v1h2v1h2v1h2v1h2v-1h2V9h2V8h2V7v2h-2v1h-2v1h-2v1H8v-1H6v-1H4V9H2V8H0z" fill="#6b4423"/>
+            <rect x="7" y="5" width="2" height="1" fill="#98c858"/><rect x="11" y="6" width="1" height="1" fill="#f1dc4f"/>
+          </svg>
+          <span>TERRAIN</span>
+        </button>
+        <button class="tab" data-tab="fences" role="tab">
+          <svg viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
+            <path d="M2 3h2v12H2zM7 2h2v13H7zM12 3h2v12h-2z" fill="#b8844a"/>
+            <path d="M1 6h14v2H1zM1 11h14v2H1z" fill="#8a5a2c"/>
+          </svg>
+          <span>FENCES</span>
+        </button>
+        <button class="tab" data-tab="animals" role="tab">
+          <svg viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
+            <path d="M5 8h6v1h1v2h1v3h-1v1H9v-1H7v1H4v-1H3v-3h1V9h1z" fill="#e8b860"/>
+            <path d="M2 4h2v3H2zM5 1h2v4H5zM9 1h2v4H9zM12 4h2v3h-2z" fill="#e8b860"/>
+          </svg>
+          <span>ANIMALS</span>
+        </button>
+        <button class="tab" data-tab="staff" role="tab">
+          <svg viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
+            <rect x="3" y="1" width="6" height="1" fill="#c7b37a"/><rect x="2" y="2" width="8" height="1" fill="#c7b37a"/>
+            <rect x="4" y="3" width="4" height="3" fill="#e0ac69"/>
+            <rect x="3" y="7" width="6" height="5" fill="#9c8a4a"/>
+            <rect x="4" y="12" width="2" height="3" fill="#6b5e32"/><rect x="7" y="12" width="2" height="3" fill="#6b5e32"/>
+            <rect x="11" y="5" width="3" height="3" fill="#f1c27d"/><rect x="10" y="9" width="5" height="4" fill="#c0392b"/>
+            <rect x="11" y="13" width="1" height="2" fill="#2c3e70"/><rect x="13" y="13" width="1" height="2" fill="#2c3e70"/>
+          </svg>
+          <span>STAFF</span>
+        </button>
+      </div>
+    </footer>
   </div>
 
+  <script src="terrain.js"></script>
+  <script src="sprites.js"></script>
   <script src="main.js"></script>
 </body>
 </html>
