@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-  <meta name="theme-color" content="#ffffff" />
+  <meta name="theme-color" content="#2a3528" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>Zoo Tycoon</title>
+  <title>Zoo Tycoon 3D</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet" />
@@ -14,87 +14,75 @@
 </head>
 <body>
   <div id="app">
-    <!-- Top status bar -->
-    <header id="topbar">
-      <div class="stat" id="stat-cash">
-        <span class="stat-icon cash">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M14.8 9.2c-.5-.8-1.5-1.3-2.8-1.3-1.7 0-2.8.9-2.8 2.1 0 2.9 5.8 1.4 5.8 4.2 0 1.2-1.2 2.1-3 2.1-1.4 0-2.5-.6-3-1.5M12 6.5v1.4M12 16.3v1.2"/></svg>
-        </span>
-        <div class="stat-text">
-          <span class="stat-label">Funds</span>
-          <span class="stat-value" id="cash-value">$10,000</span>
+    <canvas id="game"></canvas>
+    <canvas id="overlay"></canvas>
+
+    <!-- Top HUD -->
+    <header id="hud">
+      <div class="hud-group">
+        <button class="orb sm" id="pause-btn" aria-label="Pause">
+          <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>
+          <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13a1 1 0 001.5.9l10-6.5a1 1 0 000-1.8l-10-6.5A1 1 0 008 5.5z"/></svg>
+        </button>
+        <div class="pill glass" id="date-pill">
+          <span class="pill-label">Date</span>
+          <span id="date-value">Jan 1, 2000</span>
         </div>
       </div>
-
-      <div class="brand">Zoo Tycoon</div>
-
-      <div class="stat" id="stat-date">
-        <div class="stat-text right">
-          <span class="stat-label">Date</span>
-          <span class="stat-value" id="date-value">Jan 1, 2000</span>
-        </div>
-        <span class="stat-icon date">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
-        </span>
+      <div class="pill glass" id="cash-pill">
+        <svg class="coin" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#f2c94c" stroke="#9c7414" stroke-width="1.5"/><circle cx="12" cy="12" r="6.5" fill="none" stroke="#c99a22" stroke-width="1.2"/><path d="M12 8v8M10 10h3.2a1.3 1.3 0 010 2.6h-2.4a1.3 1.3 0 000 2.6H14" fill="none" stroke="#7a5a0c" stroke-width="1.4" stroke-linecap="round"/></svg>
+        <span id="cash-value">$10,000</span>
       </div>
     </header>
 
-    <!-- Map -->
-    <main id="viewport">
-      <canvas id="game"></canvas>
+    <div id="hint" class="glass" hidden>
+      <span id="hint-text"></span>
+      <button class="orb xs" id="hint-cancel" aria-label="Cancel tool">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+      </button>
+    </div>
 
-      <div id="hint" hidden>
-        <span id="hint-text"></span>
-        <button id="hint-cancel" class="icon-btn" aria-label="Cancel tool">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
-        </button>
-      </div>
+    <!-- Camera controls -->
+    <nav id="side-panel" aria-label="Camera controls">
+      <button class="orb" id="zoom-in" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button>
+      <button class="orb" id="zoom-out" aria-label="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button>
+      <button class="orb" id="rot-left" aria-label="Rotate left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 107.5-7.5H8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M10 1.5L6.5 4.5 10 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="orb" id="rot-right" aria-label="Rotate right"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12A7.5 7.5 0 1112 4.5h4" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M14 1.5l3.5 3L14 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="orb" id="zoom-reset" aria-label="Recenter"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" stroke-width="2.4"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/><path d="M12 2v3.5M12 18.5V22M2 12h3.5M18.5 12H22" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
+      <button class="orb on" id="grid-toggle" aria-label="Toggle grid" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM4 9.3h16M4 14.6h16M9.3 4v16M14.6 4v16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>
+    </nav>
 
-      <nav id="side-panel" aria-label="View controls">
-        <button class="fab" id="zoom-in" aria-label="Zoom in">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-        </button>
-        <button class="fab" id="zoom-out" aria-label="Zoom out">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
-        </button>
-        <button class="fab" id="zoom-reset" aria-label="Recenter map">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
-        </button>
-        <button class="fab on" id="grid-toggle" aria-label="Toggle grid" aria-pressed="true">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5z"/><path d="M7.5 5.5l9 5M16.5 5.5l-9 5"/><path d="M3 13l9 5 9-5"/></svg>
-        </button>
-      </nav>
+    <div id="tile-info" class="glass" hidden><div id="tile-info-text"></div></div>
 
-      <div id="tile-info" class="card" hidden><div id="tile-info-text"></div></div>
-      <div id="loading"><div class="spinner"></div></div>
-    </main>
-
-    <!-- Construction toolbar -->
-    <footer id="toolbar">
+    <!-- Construction dock -->
+    <footer id="dock" class="glass">
       <div id="tray"><div id="tray-items"></div></div>
       <div id="tabs" role="tablist">
         <button class="tab" data-tab="terrain" role="tab">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18l6-9 4 6 3-4 5 7z"/><circle cx="17" cy="6" r="2"/></svg>
+          <span class="orb tab-orb"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 19l6.5-9 4 5.5 3-3.5L22 19z" fill="#5c9a3a"/><path d="M8.5 10L11 13.5H6z" fill="#e9f3e0"/><circle cx="17.5" cy="6.5" r="2.5" fill="#f5c542"/></svg></span>
           <span>Terrain</span>
         </button>
         <button class="tab" data-tab="fences" role="tab">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V6l2-2 2 2v14M15 20V6l2-2 2 2v14M3 10h18M3 15h18"/></svg>
+          <span class="orb tab-orb"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 21V7l2-2.5 2 2.5v14zM10 21V7l2-2.5 2 2.5v14zM16.5 21V7l2-2.5 2 2.5v14z" fill="#8a5a32"/><path d="M2 10h20v2.4H2zM2 16h20v2.4H2z" fill="#5c3e24"/></svg></span>
           <span>Fences</span>
         </button>
         <button class="tab" data-tab="animals" role="tab">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="9" r="2"/><circle cx="10" cy="5.5" r="2"/><circle cx="14" cy="5.5" r="2"/><circle cx="18" cy="9" r="2"/><path d="M8 17.5c0-2.8 1.8-5.5 4-5.5s4 2.7 4 5.5c0 1.6-1.3 2.5-4 2.5s-4-.9-4-2.5z"/></svg>
+          <span class="orb tab-orb"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="6" cy="10" rx="2.2" ry="2.7" fill="#e08a2c"/><ellipse cx="10" cy="6" rx="2.2" ry="2.7" fill="#e08a2c"/><ellipse cx="14" cy="6" rx="2.2" ry="2.7" fill="#e08a2c"/><ellipse cx="18" cy="10" rx="2.2" ry="2.7" fill="#e08a2c"/><path d="M7.5 17.5c0-3.2 2-6 4.5-6s4.5 2.8 4.5 6c0 2-1.7 3-4.5 3s-4.5-1-4.5-3z" fill="#c96f1c"/></svg></span>
           <span>Animals</span>
         </button>
         <button class="tab" data-tab="staff" role="tab">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7.5" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><path d="M16 4.3a3.5 3.5 0 010 6.4M18 13.8c2 .9 3.5 3.1 3.5 5.7"/></svg>
+          <span class="orb tab-orb"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5.4" rx="6.5" ry="1.6" fill="#b89a55"/><path d="M8.5 5.2C8.5 3 10 2 12 2s3.5 1 3.5 3.2z" fill="#d5bf86"/><circle cx="12" cy="8.6" r="3.2" fill="#e1ae7e"/><path d="M5 21c0-4.4 3.1-8 7-8s7 3.6 7 8z" fill="#7f8a45"/></svg></span>
           <span>Staff</span>
         </button>
       </div>
     </footer>
+
+    <div id="loading"><div class="spinner"></div><div class="loading-text">Building your zoo…</div></div>
   </div>
 
+  <script src="vendor/three.min.js"></script>
   <script src="terrain.js"></script>
-  <script src="sprites.js"></script>
+  <script src="models.js"></script>
   <script src="main.js"></script>
 </body>
 </html>
