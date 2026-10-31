@@ -1,341 +1,297 @@
 /* =========================================================
- * Retro Zoo Tycoon — sprites.js
- * Procedural pixel-art sprites: animals, people, fences, icons.
- * Every sprite is built from simple shapes on a tiny pixel grid,
- * then auto-shaded (lit top, dark underside) and outlined.
+ * Zoo Tycoon — sprites.js
+ * Flat-vector characters & fences drawn with canvas paths.
+ * All drawing happens in world units around the subject's feet
+ * (0,0), facing right; the caller flips with scale(-1,1).
+ * Because everything is a path, sprites stay crisp at any zoom.
  * Exposes window.Zoo.sprites
  * ========================================================= */
 (() => {
   'use strict';
   const Zoo = (window.Zoo = window.Zoo || {});
+  const TAU = Math.PI * 2;
 
-  // ---------- Colour helpers ----------
-  function parse(hex) {
-    const h = hex.slice(1);
-    const v = parseInt(h.length === 8 ? h.slice(0, 6) : h, 16);
-    const a = h.length === 8 ? parseInt(h.slice(6), 16) : 255;
-    return [v >> 16, (v >> 8) & 255, v & 255, a];
+  // ---------- Shape helpers ----------
+  function ell(c, x, y, rx, ry, fill) {
+    c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, TAU); c.fillStyle = fill; c.fill();
   }
-  const toHex = ([r, g, b]) => '#' + [r, g, b].map(c => Math.max(0, Math.min(255, Math.round(c))).toString(16).padStart(2, '0')).join('');
-  const shade = (hex, f) => {
-    const [r, g, b] = parse(hex);
-    return f >= 0
-      ? toHex([r + (255 - r) * f, g + (255 - g) * f, b + (255 - b) * f])
-      : toHex([r * (1 + f), g * (1 + f), b * (1 + f)]);
+  const circ = (c, x, y, r, fill) => ell(c, x, y, r, r, fill);
+
+  function rrectPath(c, x, y, w, h, r) {
+    r = Math.max(0, Math.min(r, w / 2, h / 2));
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r);
+    c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r);
+    c.arcTo(x, y, x + w, y, r);
+    c.closePath();
+  }
+  function rrect(c, x, y, w, h, r, fill) { rrectPath(c, x, y, w, h, r); c.fillStyle = fill; c.fill(); }
+
+  function poly(c, pts, fill) {
+    c.beginPath();
+    c.moveTo(pts[0], pts[1]);
+    for (let i = 2; i < pts.length; i += 2) c.lineTo(pts[i], pts[i + 1]);
+    c.closePath();
+    c.fillStyle = fill; c.fill();
+  }
+
+  function stroke(c, color, width, fn) {
+    c.strokeStyle = color; c.lineWidth = width; c.lineCap = 'round'; c.lineJoin = 'round';
+    c.beginPath(); fn(); c.stroke();
+  }
+
+  /** Ellipse with a flat darker underside (simple two-tone shading). */
+  function shadedEll(c, x, y, rx, ry, fill, shade) {
+    ell(c, x, y, rx, ry, fill);
+    c.save();
+    c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, TAU); c.clip();
+    c.fillStyle = shade;
+    c.beginPath(); c.ellipse(x, y + ry * 0.95, rx * 1.1, ry * 0.62, 0, 0, TAU); c.fill();
+    c.restore();
+  }
+
+  const lift = v => Math.max(0, v) * 1.6;
+
+  /** Rounded leg from `top` down to the ground (minus lift), optional hoof/paw. */
+  function leg(c, x, top, w, lifted, fill, foot) {
+    const bottom = -lifted;
+    rrect(c, x - w / 2, top, w, bottom - top, w / 2, fill);
+    if (foot) rrect(c, x - w / 2, bottom - 1.6, w, 1.6, 0.8, foot);
+  }
+
+  function eye(c, x, y, r = 0.95) {
+    circ(c, x, y, r, '#23262D');
+    circ(c, x + r * 0.35, y - r * 0.35, r * 0.35, '#FFFFFF');
+  }
+
+  // ---------- Animals ----------
+  const ANIMALS = {
+    lion(c, s) {
+      const b = -Math.abs(s) * 0.8;
+      const body = '#F4B942', bodyD = '#DE9A2A', mane = '#D2722F', maneD = '#B25B22', face = '#F9CB63', muzzle = '#FFE7AE';
+      stroke(c, bodyD, 2, () => { c.moveTo(-9, -12 + b); c.quadraticCurveTo(-16, -12 + b, -15, -19 + b); });
+      circ(c, -15, -20 + b, 2.4, maneD);
+      leg(c, -6 + s * 1.8, -10 + b, 3.4, lift(-s), bodyD);
+      leg(c, 6 - s * 1.8, -10 + b, 3.4, lift(s), bodyD);
+      shadedEll(c, 0, -13 + b, 10.5, 6.2, body, bodyD);
+      leg(c, -4 - s * 1.8, -10 + b, 3.8, lift(s), body, '#FBD98C');
+      leg(c, 8 + s * 1.8, -10 + b, 3.8, lift(-s), body, '#FBD98C');
+      // Mane: a scalloped disc
+      for (let i = 0; i < 11; i++) {
+        const a = (i / 11) * TAU;
+        circ(c, 9 + Math.cos(a) * 6.4, -19 + b + Math.sin(a) * 6.4, 2.9, i % 2 ? mane : maneD);
+      }
+      circ(c, 9, -19 + b, 7, mane);
+      circ(c, 6.6, -23.2 + b, 1.7, face);
+      circ(c, 12.6, -23.2 + b, 1.7, face);
+      circ(c, 9.6, -18.6 + b, 5, face);
+      ell(c, 10.6, -16.4 + b, 3, 2, muzzle);
+      eye(c, 8.1, -19.8 + b);
+      eye(c, 12, -19.8 + b);
+      poly(c, [9.5, -17.6 + b, 11.7, -17.6 + b, 10.6, -16.3 + b], '#5A3520');
+    },
+
+    elephant(c, s) {
+      const b = -Math.abs(s) * 0.6;
+      const skin = '#A9B5C4', skinD = '#8E9BAC', ear = '#97A4B5', inner = '#F2B8C4', tusk = '#FFFDF2';
+      stroke(c, skinD, 1.5, () => { c.moveTo(-14, -18 + b); c.quadraticCurveTo(-17, -14 + b, -16.5, -10 + b); });
+      circ(c, -16.5, -9.5 + b, 1.3, '#4A5160');
+      leg(c, -8 + s * 1.5, -12 + b, 5.6, lift(-s), skinD);
+      leg(c, 6 - s * 1.5, -12 + b, 5.6, lift(s), skinD);
+      shadedEll(c, -1, -17 + b, 14, 10.5, skin, skinD);
+      for (const [x, l] of [[-5 - s * 1.5, lift(s)], [9 + s * 1.5, lift(-s)]]) {
+        leg(c, x, -11 + b, 6.2, l, skin);
+        ell(c, x + 1.2, -l - 1, 1.3, 0.8, '#E9EDF2');
+        ell(c, x - 1.4, -l - 1, 1.1, 0.7, '#E9EDF2');
+      }
+      circ(c, 13, -22 + b, 8.4, skin);
+      stroke(c, skin, 4.4, () => { c.moveTo(18.5, -19 + b); c.bezierCurveTo(22.5, -14 + b, 20.5, -8.5 + b, 23.5, -6.5 + b); });
+      circ(c, 23.6, -6.6 + b, 2.2, skin);
+      stroke(c, tusk, 1.9, () => { c.moveTo(17, -15 + b); c.quadraticCurveTo(19, -11.5 + b, 21.5, -12.5 + b); });
+      ell(c, 7.2, -21 + b, 6.2, 8.2, ear);
+      ell(c, 7.6, -21 + b, 3.9, 5.7, inner);
+      eye(c, 15.4, -24.3 + b, 1.05);
+      circ(c, 17.5, -21 + b, 1.2, 'rgba(242,184,196,0.7)');
+    },
+
+    zebra(c, s) {
+      const b = -Math.abs(s) * 0.8;
+      const W = '#FBFBF7', Wd = '#E2E3DC', K = '#262A31';
+      stroke(c, W, 1.7, () => { c.moveTo(-10, -15 + b); c.quadraticCurveTo(-13.5, -13 + b, -14, -9 + b); });
+      ell(c, -14.1, -8.2 + b, 1.4, 2.2, K);
+      leg(c, -6 + s * 1.8, -11 + b, 2.9, lift(-s), Wd, K);
+      leg(c, 6 - s * 1.8, -11 + b, 2.9, lift(s), Wd, K);
+      shadedEll(c, 0, -14 + b, 10.5, 5.9, W, Wd);
+      // Stripes clipped to the body
+      c.save();
+      c.beginPath(); c.ellipse(0, -14 + b, 10.5, 5.9, 0, 0, TAU); c.clip();
+      for (const x of [-8, -4.4, -0.8, 2.8, 6.4]) {
+        stroke(c, K, 1.5, () => { c.moveTo(x - 1.5, -21 + b); c.quadraticCurveTo(x + 1.8, -14 + b, x - 1, -7 + b); });
+      }
+      c.restore();
+      for (const [x, l] of [[-4 - s * 1.8, lift(s)], [8 + s * 1.8, lift(-s)]]) {
+        leg(c, x, -10.5 + b, 3.1, l, W, K);
+        rrect(c, x - 1.55, -6.5 - l, 3.1, 1.3, 0.5, K);
+      }
+      // Neck with stripes
+      const neck = [5, -16 + b, 8.2, -27 + b, 13, -26 + b, 10.4, -13 + b];
+      poly(c, neck, W);
+      c.save();
+      c.beginPath(); c.moveTo(neck[0], neck[1]); for (let i = 2; i < 8; i += 2) c.lineTo(neck[i], neck[i + 1]); c.closePath(); c.clip();
+      for (const y of [-24, -20.5, -17]) stroke(c, K, 1.4, () => { c.moveTo(4, y + b); c.lineTo(14, y + 1.5 + b); });
+      c.restore();
+      stroke(c, K, 2.6, () => { c.moveTo(5.6, -17 + b); c.lineTo(8.4, -29.5 + b); });
+      // Head
+      c.save();
+      c.translate(13.6, -27.6 + b);
+      c.rotate(0.38);
+      ell(c, 0, 0, 5.8, 3.3, W);
+      stroke(c, K, 1.2, () => { c.moveTo(-2.8, -3); c.lineTo(-2.2, 3); c.moveTo(-0.2, -3.2); c.lineTo(0.2, 3.2); });
+      ell(c, 4.4, 0.3, 2.5, 2.6, '#3B3F47');
+      c.restore();
+      poly(c, [9.4, -30.2 + b, 10.4, -34.6 + b, 12.4, -30.6 + b], W);
+      poly(c, [9.9, -32.5 + b, 10.4, -34.6 + b, 11.2, -32.6 + b], K);
+      eye(c, 13, -29.3 + b, 0.95);
+    },
   };
 
-  // ---------- Pixel grid ----------
-  function grid(w, h) { return { w, h, px: new Array(w * h).fill(null) }; }
-  function set(g, x, y, c) {
-    x = Math.floor(x); y = Math.floor(y);
-    if (x >= 0 && y >= 0 && x < g.w && y < g.h) g.px[y * g.w + x] = c;
-  }
-  const paint = (fill, x, y) => (typeof fill === 'function' ? fill(x, y) : fill);
-  function rect(g, x, y, w, h, fill) {
-    for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) set(g, i, j, paint(fill, i, j));
-  }
-  function ellipse(g, cx, cy, rx, ry, fill) {
-    for (let y = Math.floor(cy - ry) - 1; y <= cy + ry + 1; y++) {
-      for (let x = Math.floor(cx - rx) - 1; x <= cx + rx + 1; x++) {
-        const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry;
-        if (dx * dx + dy * dy <= 1) set(g, x, y, paint(fill, x, y));
-      }
-    }
-  }
-  function line(g, x0, y0, x1, y1, fill, thick = 1) {
-    const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
-    for (let s = 0; s <= steps; s++) {
-      const x = x0 + ((x1 - x0) * s) / steps, y = y0 + ((y1 - y0) * s) / steps;
-      rect(g, Math.round(x), Math.round(y), thick, 1, fill);
-    }
-  }
-
-  /** Grid -> canvas, with optional auto-shading and selective outline. */
-  function finalize(g, { outline = true, light = true, outlineColor = null } = {}) {
-    const { w, h } = g;
-    const src = g.px;
-    const out = src.slice();
-    const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? null : src[y * w + x]);
-    if (light) {
-      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-        const c = src[y * w + x];
-        if (!c || c.length > 7) continue;
-        if (!at(x, y - 1)) out[y * w + x] = shade(c, 0.22);
-        else if (!at(x, y + 1)) out[y * w + x] = shade(c, -0.25);
-      }
-    }
-    if (outline) {
-      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-        if (src[y * w + x]) continue;
-        const n = at(x, y - 1) || at(x, y + 1) || at(x - 1, y) || at(x + 1, y);
-        if (n && n.length <= 7) out[y * w + x] = outlineColor || shade(n, -0.7);
-      }
-    }
-    const c = document.createElement('canvas');
-    c.width = w; c.height = h;
-    const ctx = c.getContext('2d');
-    const img = ctx.createImageData(w, h);
-    for (let i = 0; i < out.length; i++) {
-      if (!out[i]) continue;
-      const [r, gg, b, a] = parse(out[i]);
-      img.data.set([r, gg, b, a], i * 4);
-    }
-    ctx.putImageData(img, 0, 0);
-    return c;
-  }
-
-  // Walk cycle: diagonal leg pairs swing opposite to each other
-  const SWING = [-1, 0, 1, 0];
-  function legs(f) {
-    const a = SWING[f];
-    return { a, b: -a, liftA: f === 1 ? 1 : 0, liftB: f === 3 ? 1 : 0 };
-  }
-  function leg(g, x, y, w, h, color, hoof, lift) {
-    rect(g, x, y, w, h - lift, color);
-    if (hoof) rect(g, x, y + h - lift - 1, w, 1, hoof);
-  }
-
-  // ---------- Animals (all drawn facing right) ----------
-  const ANIMALS = {
-    lion: {
-      w: 32, h: 23, ax: 15, ay: 21,
-      draw(g, f) {
-        const body = '#d6a24a', far = '#b07c2c', mane = '#8a4515', maneL = '#a85a1e', muzzle = '#f0d9a0';
-        const { a, b, liftA, liftB } = legs(f);
-        line(g, 6, 11, 3, 7, body);                     // tail
-        rect(g, 2, 5, 2, 2, mane);
-        leg(g, 8 + b, 13, 2, 8, far, '#6b4a1c', liftB);  // far legs
-        leg(g, 19 + a, 13, 2, 8, far, '#6b4a1c', liftA);
-        ellipse(g, 14, 11.5, 9, 4.3, body);              // body
-        rect(g, 8, 14, 12, 1, '#c99540');                 // belly line
-        leg(g, 10 + a, 13, 3, 8, body, '#8a6526', liftA); // near legs
-        leg(g, 21 + b, 13, 3, 8, body, '#8a6526', liftB);
-        ellipse(g, 24, 8, 5.2, 5.8, (x, y) => ((x * 3 + y) % 4 === 0 ? maneL : mane)); // mane
-        ellipse(g, 25.6, 8.6, 3.3, 2.9, body);           // face
-        rect(g, 27, 9, 3, 2, muzzle);
-        set(g, 29, 9, '#3a1a0a');                          // nose
-        set(g, 26, 7, '#1a0d05');                          // eye
-        set(g, 24, 4, maneL);
-      },
-    },
-    elephant: {
-      w: 42, h: 32, ax: 19, ay: 30,
-      draw(g, f) {
-        const skin = '#8e9098', far = '#73757d', ear = '#7b7d86', tusk = '#f4efdd', toe = '#c9c7bb';
-        const { a, b, liftA, liftB } = legs(f);
-        line(g, 5, 13, 3, 20, far);                      // tail
-        rect(g, 2, 20, 2, 2, '#3a3a3a');
-        leg(g, 9 + b, 19, 4, 11, far, '#5b5d64', liftB);  // far legs
-        leg(g, 24 + a, 19, 4, 11, far, '#5b5d64', liftA);
-        ellipse(g, 17, 15, 12.5, 8.8, skin);             // body
-        leg(g, 12 + a, 20, 5, 10, skin, toe, liftA);      // near legs
-        leg(g, 27 + b, 20, 5, 10, skin, toe, liftB);
-        ellipse(g, 31, 11, 5.6, 6.2, skin);              // head
-        for (let y = 13; y <= 26; y++) {                  // trunk
-          const x = 34 + (y > 21 ? 1 : 0) + (y > 24 ? 1 : 0);
-          rect(g, x, y, y < 18 ? 3 : 2, 1, skin);
-        }
-        set(g, 37, 25, skin); set(g, 37, 24, skin);
-        line(g, 32, 17, 34, 19, tusk);                   // tusk
-        ellipse(g, 27.5, 11.5, 4.2, 6.2, ear);            // ear
-        ellipse(g, 27.8, 11.5, 2.4, 4, '#9a8088');
-        set(g, 33, 9, '#111');                            // eye
-      },
-    },
-    zebra: {
-      w: 32, h: 27, ax: 14, ay: 25,
-      draw(g, f) {
-        const W = '#f2f0e6', K = '#1e1e22';
-        const stripes = (x, y) => (((x + (y >> 1)) % 3 === 0) ? K : W);
-        const legStripe = (x, y) => (y % 3 === 0 ? K : W);
-        const { a, b, liftA, liftB } = legs(f);
-        line(g, 5, 11, 3, 17, W);                        // tail
-        rect(g, 2, 17, 2, 2, K);
-        leg(g, 8 + b, 13, 2, 11, legStripe, K, liftB);   // far legs
-        leg(g, 18 + a, 13, 2, 11, legStripe, K, liftA);
-        ellipse(g, 13, 11.5, 8.6, 4.3, stripes);         // body
-        leg(g, 10 + a, 14, 3, 10, legStripe, K, liftA);   // near legs
-        leg(g, 20 + b, 14, 3, 10, legStripe, K, liftB);
-        ellipse(g, 21, 7.5, 2.8, 5, (x, y) => (y % 2 === 0 ? K : W)); // neck
-        line(g, 19, 7, 22, 1, K);                        // mane
-        ellipse(g, 25, 4, 4.4, 2.3, stripes);            // head
-        rect(g, 27, 4, 3, 2, '#2c2c30');                 // muzzle
-        set(g, 25, 3, '#000');                            // eye
-        set(g, 22, 0, W); set(g, 23, 0, K);              // ears
-      },
-    },
+  // Hit-test / label bounds relative to the feet, facing right
+  const BOUNDS = {
+    lion:     { x0: -18, x1: 17, y0: -28, y1: 2 },
+    elephant: { x0: -19, x1: 26, y0: -32, y1: 2 },
+    zebra:    { x0: -16, x1: 17, y0: -36, y1: 2 },
+    person:   { x0: -6,  x1: 6,  y0: -23, y1: 2 },
   };
 
   // ---------- People ----------
-  function person(g, f, { shirt, pants, skin, hair, hat }) {
-    const lift = [0, 1, 0, 0][f], lift2 = [0, 0, 0, 1][f];
-    rect(g, 3, 11, 2, 5 - lift, pants);      // legs
-    rect(g, 5, 11, 2, 5 - lift2, pants);
-    rect(g, 3, 15 - lift, 2, 1, '#2a2018');  // shoes
-    rect(g, 5, 15 - lift2, 2, 1, '#2a2018');
-    rect(g, 2, 6, 6, 6, shirt);              // torso
-    rect(g, 1, 7 + (f === 1 ? 1 : 0), 1, 4, shirt);
-    rect(g, 8, 7 + (f === 3 ? 1 : 0), 1, 4, shirt);
-    set(g, 1, 11 + (f === 1 ? 1 : 0), skin);
-    set(g, 8, 11 + (f === 3 ? 1 : 0), skin);
-    ellipse(g, 5, 3.6, 2.6, 2.7, skin);      // head
-    if (hat) { rect(g, 1, 1, 8, 1, hat); rect(g, 3, 0, 4, 1, hat); }
-    else rect(g, 3, 1, 4, 1, hair);
-  }
-
   const GUEST_LOOKS = [
-    { shirt: '#c0392b', pants: '#2c3e70', skin: '#f1c27d', hair: '#4a2c14' },
-    { shirt: '#2e86c1', pants: '#3b3b3b', skin: '#c68642', hair: '#1a1a1a' },
-    { shirt: '#f1c40f', pants: '#4a5a2a', skin: '#e0ac69', hair: '#8a5a2a' },
-    { shirt: '#8e44ad', pants: '#2c3e50', skin: '#8d5524', hair: '#0e0e0e' },
-    { shirt: '#27ae60', pants: '#5d4037', skin: '#ffdbac', hair: '#d4a24a' },
-    { shirt: '#e67e22', pants: '#34495e', skin: '#f1c27d', hair: '#6d3b1a' },
-    { shirt: '#ecf0f1', pants: '#7b241c', skin: '#c68642', hair: '#2b1b0e' },
+    { shirt: '#EF6461', pants: '#3D4A6B', skin: '#F3C9A0', hair: '#5A3A22' },
+    { shirt: '#4C9BE8', pants: '#3A3F47', skin: '#C98B5B', hair: '#1F1F24' },
+    { shirt: '#F7C548', pants: '#5B6B3A', skin: '#E2AF7E', hair: '#8A5A2A' },
+    { shirt: '#9B6DD6', pants: '#2F3B4C', skin: '#8D5A3B', hair: '#121212' },
+    { shirt: '#3BBF8A', pants: '#6A4E3D', skin: '#FCDCB8', hair: '#D8A94F' },
+    { shirt: '#F28C38', pants: '#34495E', skin: '#F3C9A0', hair: '#6D3B1A' },
+    { shirt: '#F4F5F7', pants: '#8E3B46', skin: '#C98B5B', hair: '#2B1B0E' },
   ];
-  const KEEPER_LOOK = { shirt: '#9c8a4a', pants: '#6b5e32', skin: '#e0ac69', hair: '#3a2614', hat: '#c7b37a' };
+  const KEEPER_LOOK = { shirt: '#8C9A4E', pants: '#5E6634', skin: '#E2AF7E', hair: '#3A2614', hat: '#D9C38A' };
 
-  // ---------- Build sprite sheets ----------
-  function build(def) {
-    const frames = [];
-    for (let f = 0; f < 4; f++) {
-      const g = grid(def.w, def.h);
-      def.draw(g, f);
-      frames.push(finalize(g));
-    }
-    return { frames, ax: def.ax, ay: def.ay, w: def.w, h: def.h };
+  function darken(hex, f) {
+    const v = parseInt(hex.slice(1), 16);
+    const ch = s => Math.round(((v >> s) & 255) * (1 - f));
+    return `rgb(${ch(16)},${ch(8)},${ch(0)})`;
   }
 
-  const animals = {};
-  for (const [k, def] of Object.entries(ANIMALS)) animals[k] = build(def);
-
-  const personDef = look => ({ w: 10, h: 17, ax: 5, ay: 15, draw: (g, f) => person(g, f, look) });
-  const guests = GUEST_LOOKS.map(l => build(personDef(l)));
-  const keeper = build(personDef(KEEPER_LOOK));
+  function drawPerson(c, s, look) {
+    const l1 = Math.max(0, s) * 1.3, l2 = Math.max(0, -s) * 1.3;
+    rrect(c, -2.7 + s * 0.8, -7.5, 2.4, 7.5 - l1, 1.2, look.pants);
+    rrect(c, 0.3 - s * 0.8, -7.5, 2.4, 7.5 - l2, 1.2, look.pants);
+    const arm = darken(look.shirt, 0.15);
+    rrect(c, -4.9, -14 - s * 0.7, 2, 6, 1, arm);
+    rrect(c, 2.9, -14 + s * 0.7, 2, 6, 1, arm);
+    rrect(c, -3.6, -15, 7.2, 8.6, 2.8, look.shirt);
+    circ(c, 0, -18.2, 3.2, look.skin);
+    if (look.hat) {
+      ell(c, 0, -20.2, 4.8, 1.4, look.hat);
+      rrect(c, -2.6, -23.4, 5.2, 3.4, 1.8, look.hat);
+      rrect(c, -2.6, -21.2, 5.2, 0.9, 0.3, darken(look.hat, 0.25));
+    } else {
+      c.beginPath(); c.arc(0, -18.4, 3.3, Math.PI * 1.05, Math.PI * 1.95); c.closePath();
+      c.fillStyle = look.hair; c.fill();
+    }
+  }
 
   // ---------- Fences ----------
-  // A segment runs from its anchor point 32 px right / 16 px down (one tile
-  // edge). The mirrored canvas covers edges running down-left.
   const FENCES = {
-    1: { name: 'Wood Fence', height: 13 },
-    2: { name: 'Iron Fence', height: 18 },
+    1: { name: 'Wood Fence', height: 12 },
+    2: { name: 'Iron Fence', height: 16 },
+  };
+  const FC = {
+    1: { top: '#E7B37A', left: '#C88B4C', right: '#A86F38', rail: '#C98C4E', railTop: '#EBB880' },
+    2: { top: '#8A93A3', left: '#5A6271', right: '#434A57', rail: '#4E5563', railTop: '#8A93A3', bar: '#434A57', tip: '#B9C1CC' },
   };
 
-  function mirror(src) {
-    const c = document.createElement('canvas');
-    c.width = src.width; c.height = src.height;
-    const x = c.getContext('2d');
-    x.translate(src.width, 0); x.scale(-1, 1);
-    x.drawImage(src, 0, 0);
-    return c;
-  }
-
-  function fenceSegment(type) {
-    const H = FENCES[type].height;
-    const g = grid(36, H + 22);
-    const ax = 2, ay = H + 3;
-    for (let t = 0; t <= 32; t++) {
-      const gx = ax + t, gy = ay + Math.floor(t / 2);
-      set(g, gx, gy + 1, '#00000048');                   // ground shadow
-      if (type === 1) {
-        for (const r of [4, 9]) {                        // two log rails
-          set(g, gx, gy - r - 1, '#b8844a');
-          set(g, gx, gy - r, '#8a5a2c');
-          set(g, gx, gy - r + 1, '#4a2e17');
-        }
-        if (t >= 15 && t <= 16) {                         // middle picket
-          for (let y = 1; y <= 11; y++) set(g, gx, gy - y, t === 15 ? '#8d5f34' : '#5a3a1c');
-          set(g, gx, gy - 12, '#b8844a');
-        }
-      } else {
-        set(g, gx, gy - 3, '#4a4a55');                    // bottom rail
-        set(g, gx, gy - 2, '#1c1c22');
-        set(g, gx, gy - H + 4, '#5a5a66');                // top rail
-        set(g, gx, gy - H + 5, '#1c1c22');
-        if (t % 3 === 1) {                               // bars with spear tips
-          for (let y = 2; y <= H - 2; y++) set(g, gx, gy - y, '#2a2a31');
-          set(g, gx, gy - H + 1, '#9a9aa6');
-        }
+  function drawFenceSegment(c, type, ax, ay, bx, by) {
+    const f = FC[type], H = FENCES[type].height;
+    stroke(c, 'rgba(0,0,0,0.12)', 2.4, () => { c.moveTo(ax, ay + 1.2); c.lineTo(bx, by + 1.2); });
+    if (type === 1) {
+      for (const r of [4, 9]) {
+        poly(c, [ax, ay - r - 2.6, bx, by - r - 2.6, bx, by - r, ax, ay - r], f.rail);
+        stroke(c, f.railTop, 0.9, () => { c.moveTo(ax, ay - r - 2.6); c.lineTo(bx, by - r - 2.6); });
+      }
+    } else {
+      c.strokeStyle = f.bar; c.lineWidth = 1; c.lineCap = 'butt';
+      c.beginPath();
+      for (let i = 1; i < 8; i++) {
+        const t = i / 8, x = ax + (bx - ax) * t, y = ay + (by - ay) * t;
+        c.moveTo(x, y); c.lineTo(x, y - H + 1.5);
+      }
+      c.stroke();
+      for (const r of [3, H - 3.5]) poly(c, [ax, ay - r - 1.5, bx, by - r - 1.5, bx, by - r, ax, ay - r], f.rail);
+      for (let i = 1; i < 8; i++) {
+        const t = i / 8;
+        circ(c, ax + (bx - ax) * t, ay + (by - ay) * t - H + 1.2, 0.8, f.tip);
       }
     }
-    const right = finalize(g, { outline: false, light: false });
-    return { right, left: mirror(right), ax, ay, w: g.w };
   }
 
-  function fencePost(type, corner) {
-    const H = FENCES[type].height;
-    const g = grid(9, H + 8);
-    const ax = 4, ay = H + 6;
-    set(g, 3, ay + 1, '#00000048'); set(g, 4, ay + 1, '#00000048'); set(g, 5, ay + 1, '#00000048');
-    if (type === 1) {
-      const top = ay - H - 2 - (corner ? 1 : 0);
-      rect(g, 3, top, 3, ay - top + 1, (x) => (x === 3 ? '#9a6a3a' : x === 4 ? '#7d5129' : '#5a3a1c'));
-      rect(g, 3, top, 3, 1, '#c8955a');
-      if (corner) rect(g, 2, top + 2, 5, 1, '#6b4423');
-      return { canvas: finalize(g, { light: false, outlineColor: '#24150a' }), ax, ay };
-    }
-    const top = ay - H - 1;
-    rect(g, 3, top, 3, ay - top + 1, (x) => (x === 3 ? '#5a5a66' : x === 4 ? '#33333b' : '#1e1e24'));
-    const knob = corner ? 2 : 1;
-    rect(g, 4 - knob + 1, top - 2, knob * 2 - 1 + (corner ? 0 : 1), 2, '#e0b84a');
-    set(g, 4, top - 2, '#fff0a8');
-    return { canvas: finalize(g, { light: false, outlineColor: '#121216' }), ax, ay };
+  /** Isometric box post: top + two visible side faces. */
+  function drawFencePost(c, type, x, y, corner) {
+    const f = FC[type];
+    const w = corner ? 3.4 : 2.7, h = FENCES[type].height + (corner ? 2.5 : 1.5), hw = w / 2;
+    ell(c, x, y + 0.6, w + 1.2, (w + 1.2) / 2, 'rgba(0,0,0,0.12)');
+    poly(c, [x - w, y - h, x, y - h + hw, x, y + hw, x - w, y], f.left);
+    poly(c, [x, y - h + hw, x + w, y - h, x + w, y, x, y + hw], f.right);
+    poly(c, [x, y - h - hw, x + w, y - h, x, y - h + hw, x - w, y - h], f.top);
+    if (type === 2) circ(c, x, y - h - 1.2, w * 0.75, corner ? '#E3B94F' : f.tip);
   }
 
-  const fences = {};
-  for (const type of [1, 2]) {
-    fences[type] = { segment: fenceSegment(type), post: fencePost(type, false), corner: fencePost(type, true) };
-  }
-
-  // ---------- Toolbar icons ----------
-  function iconCanvas(w, h, fn) {
+  // ---------- Icons for the toolbar (rendered at high resolution) ----------
+  function icon(w, h, scale, fn) {
     const c = document.createElement('canvas');
-    c.width = w; c.height = h;
+    c.width = Math.round(w * scale); c.height = Math.round(h * scale);
     const x = c.getContext('2d');
-    x.imageSmoothingEnabled = false;
+    x.scale(scale, scale);
     fn(x);
     return c.toDataURL();
   }
 
-  function terrainIcon(colors, extra) {
-    const g = grid(34, 20);
-    const rnd = Zoo.terrain.mulberry32(colors.length * 31 + colors[0].length);
-    for (let y = 0; y < 17; y++) {
-      const hw = y < 8 ? (y + 1) * 2 : (17 - y) * 2 - 2;
-      for (let x = 17 - hw; x < 17 + hw; x++) {
-        set(g, x, y + 1, colors[Math.floor(rnd() * colors.length)]);
-      }
-    }
-    if (extra) extra(g);
-    return finalize(g, { light: false, outlineColor: '#1a1008' }).toDataURL();
-  }
-
-  const H = Zoo.terrain.HEX;
-  const icons = {
-    grass: terrainIcon(H.grass.slice(2, 7), g => { set(g, 12, 8, '#f1dc4f'); set(g, 20, 11, '#f4f1e2'); }),
-    dirt: terrainIcon(H.dirt.slice(1, 6), g => { set(g, 14, 7, '#c49d68'); set(g, 19, 12, '#c49d68'); }),
-    water: terrainIcon(H.water.slice(1, 5), g => { rect(g, 10, 7, 4, 1, '#b4dcf2'); rect(g, 18, 11, 5, 1, '#6eaedb'); }),
-    path: terrainIcon(H.stone.slice(1, 5), g => {
-      for (let y = 2; y < 17; y += 4) for (let x = 0; x < 34; x++) if (g.px[y * 34 + x]) set(g, x, y, '#4f4535');
-    }),
-  };
-  for (const type of [1, 2]) {
-    const f = fences[type];
-    icons[type === 1 ? 'wood' : 'iron'] = iconCanvas(44, 38, x => {
-      const s = f.segment, p = f.post;
-      x.drawImage(p.canvas, 4 - p.ax, 12 + 2 - p.ay + 8);
-      x.drawImage(s.right, 4 - s.ax, 14 + 8 - s.ay);
-      x.drawImage(p.canvas, 36 - p.ax, 30 - p.ay + 8);
+  function terrainIcon(key) {
+    const TR = Zoo.terrain;
+    return icon(48, 34, 4, c => {
+      const cx = 24, cy = 4, w = 22, h = 11, d = 7;
+      poly(c, [cx - w, cy + h, cx, cy + h * 2, cx, cy + h * 2 + d, cx - w, cy + h + d], key === 'water' ? '#2A68A3' : TR.SOIL_L);
+      poly(c, [cx, cy + h * 2, cx + w, cy + h, cx + w, cy + h + d, cx, cy + h * 2 + d], key === 'water' ? '#245A8E' : TR.SOIL_R);
+      poly(c, [cx - w, cy + h, cx, cy + h * 2, cx, cy + h * 2 + 2.5, cx - w, cy + h + 2.5], TR.SIDE[key]);
+      poly(c, [cx, cy + h * 2, cx + w, cy + h, cx + w, cy + h + 2.5, cx, cy + h * 2 + 2.5], TR.SIDE[key]);
+      poly(c, [cx, cy, cx + w, cy + h, cx, cy + h * 2, cx - w, cy + h], TR.COLORS[key][0]);
+      if (key === 'water') stroke(c, 'rgba(255,255,255,0.55)', 1.4, () => { c.moveTo(16, 15); c.lineTo(26, 15); c.moveTo(22, 19); c.lineTo(30, 19); });
+      if (key === 'path') stroke(c, '#B7BDC6', 1.2, () => { c.moveTo(cx - w * 0.5, cy + h * 0.5); c.lineTo(cx + w * 0.5, cy + h * 1.5); });
+      if (key === 'grass') { circ(c, 18, 14, 1.3, '#7DB563'); circ(c, 29, 18, 1.3, '#7DB563'); }
+      if (key === 'dirt') { circ(c, 19, 16, 1.1, '#CDB27F'); circ(c, 28, 13, 1.1, '#CDB27F'); }
     });
   }
-  for (const k of Object.keys(animals)) {
-    const a = animals[k];
-    icons[k] = iconCanvas(a.w, a.h, x => x.drawImage(a.frames[0], 0, 0));
-  }
-  icons.keeper = iconCanvas(10, 17, x => x.drawImage(keeper.frames[0], 0, 0));
-  icons.guest = iconCanvas(22, 17, x => {
-    x.drawImage(guests[0].frames[0], 0, 0);
-    x.drawImage(guests[1].frames[2], 11, 0);
-  });
 
-  Zoo.sprites = { animals, guests, keeper, fences, FENCES, icons };
+  const icons = {};
+  for (const k of ['grass', 'dirt', 'water', 'path']) icons[k] = terrainIcon(k);
+  for (const [id, type] of [['wood', 1], ['iron', 2]]) {
+    icons[id] = icon(48, 34, 4, c => {
+      drawFencePost(c, type, 6, 22, false);
+      drawFenceSegment(c, type, 6, 22, 24, 31);
+      drawFencePost(c, type, 24, 31, false);
+      drawFenceSegment(c, type, 24, 31, 42, 22);
+      drawFencePost(c, type, 42, 22, true);
+    });
+  }
+  icons.lion = icon(40, 34, 4, c => { c.translate(20, 31); ANIMALS.lion(c, 0); });
+  icons.elephant = icon(48, 38, 4, c => { c.translate(22, 35); ANIMALS.elephant(c, 0); });
+  icons.zebra = icon(36, 40, 4, c => { c.translate(17, 38); ANIMALS.zebra(c, 0); });
+  icons.keeper = icon(20, 28, 4, c => { c.translate(10, 26); drawPerson(c, 0, KEEPER_LOOK); });
+
+  Zoo.sprites = {
+    drawAnimal: (c, species, swing) => ANIMALS[species](c, swing),
+    drawPerson, drawFenceSegment, drawFencePost,
+    GUEST_LOOKS, KEEPER_LOOK, FENCES, BOUNDS, icons,
+  };
 })();

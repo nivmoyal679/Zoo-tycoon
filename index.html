@@ -3,139 +3,91 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-  <meta name="theme-color" content="#2e1d0e" />
+  <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>Retro Zoo Tycoon</title>
+  <title>Zoo Tycoon</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div id="app">
-    <!-- Retro status bar -->
-    <header id="status-bar" class="wood">
-      <div class="readout" id="stat-cash">
-        <svg class="icon" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
-          <circle cx="8" cy="8" r="7.5" fill="#5a3a08"/>
-          <circle cx="8" cy="8" r="6.5" fill="#f2c94c"/>
-          <circle cx="8" cy="8" r="4.5" fill="#d9a521"/>
-          <rect x="7" y="4" width="2" height="8" fill="#fff2a8"/>
-          <rect x="5" y="5" width="6" height="1" fill="#fff2a8"/>
-          <rect x="5" y="10" width="6" height="1" fill="#fff2a8"/>
-        </svg>
-        <div class="readout-text">
-          <span class="readout-label">FUNDS</span>
-          <span class="readout-value" id="cash-value">$10,000</span>
+    <!-- Top status bar -->
+    <header id="topbar">
+      <div class="stat" id="stat-cash">
+        <span class="stat-icon cash">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M14.8 9.2c-.5-.8-1.5-1.3-2.8-1.3-1.7 0-2.8.9-2.8 2.1 0 2.9 5.8 1.4 5.8 4.2 0 1.2-1.2 2.1-3 2.1-1.4 0-2.5-.6-3-1.5M12 6.5v1.4M12 16.3v1.2"/></svg>
+        </span>
+        <div class="stat-text">
+          <span class="stat-label">Funds</span>
+          <span class="stat-value" id="cash-value">$10,000</span>
         </div>
       </div>
 
-      <div class="plate">ZOO TYCOON</div>
+      <div class="brand">Zoo Tycoon</div>
 
-      <div class="readout" id="stat-date">
-        <div class="readout-text right">
-          <span class="readout-label">DATE</span>
-          <span class="readout-value" id="date-value">Jan 1, 2000</span>
+      <div class="stat" id="stat-date">
+        <div class="stat-text right">
+          <span class="stat-label">Date</span>
+          <span class="stat-value" id="date-value">Jan 1, 2000</span>
         </div>
-        <svg class="icon" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
-          <rect x="1" y="2" width="14" height="14" fill="#1a1208"/>
-          <rect x="2" y="3" width="12" height="12" fill="#f3ecd8"/>
-          <rect x="2" y="3" width="12" height="3" fill="#c0392b"/>
-          <rect x="4" y="1" width="2" height="4" fill="#6b6b6b"/>
-          <rect x="10" y="1" width="2" height="4" fill="#6b6b6b"/>
-          <rect x="4" y="8" width="2" height="2" fill="#7a6a50"/>
-          <rect x="7" y="8" width="2" height="2" fill="#7a6a50"/>
-          <rect x="10" y="8" width="2" height="2" fill="#7a6a50"/>
-          <rect x="4" y="11" width="2" height="2" fill="#7a6a50"/>
-          <rect x="7" y="11" width="2" height="2" fill="#c0392b"/>
-        </svg>
+        <span class="stat-icon date">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
+        </span>
       </div>
     </header>
 
-    <!-- Game map -->
+    <!-- Map -->
     <main id="viewport">
       <canvas id="game"></canvas>
 
-      <nav id="side-panel" class="wood" aria-label="View controls">
-        <button class="btn" id="zoom-in" aria-label="Zoom in" title="Zoom in">
-          <svg viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
-            <path d="M4 1h5v1h1v1h1v1h1v5h-1v1h-1v1h-1v1H4v-1H3v-1H2V9H1V4h1V3h1V2h1z M4 3v1H3v5h1v1h5V9h1V4H9V3z" fill="currentColor"/>
-            <rect x="5" y="6" width="3" height="1" fill="currentColor"/><rect x="6" y="5" width="1" height="3" fill="currentColor"/>
-            <path d="M11 11h2v1h1v1h1v2h-2v-1h-1v-1h-1z" fill="currentColor"/>
-          </svg>
-        </button>
-        <button class="btn" id="zoom-out" aria-label="Zoom out" title="Zoom out">
-          <svg viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
-            <path d="M4 1h5v1h1v1h1v1h1v5h-1v1h-1v1h-1v1H4v-1H3v-1H2V9H1V4h1V3h1V2h1z M4 3v1H3v5h1v1h5V9h1V4H9V3z" fill="currentColor"/>
-            <rect x="5" y="6" width="3" height="1" fill="currentColor"/>
-            <path d="M11 11h2v1h1v1h1v2h-2v-1h-1v-1h-1z" fill="currentColor"/>
-          </svg>
-        </button>
-        <button class="btn" id="zoom-reset" aria-label="Reset view" title="Reset view">
-          <svg viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
-            <path d="M7 1h2v1h1v1h1v1h1v1h1v1h1v1h1v2h-2v6H3V9H1V7h1V6h1V5h1V4h1V3h1V2h1z" fill="currentColor"/>
-            <rect x="7" y="10" width="2" height="5" fill="#2e1d0e"/>
-          </svg>
-        </button>
-        <button class="btn on" id="grid-toggle" aria-label="Toggle grid" aria-pressed="true" title="Toggle grid">
-          <svg viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
-            <path d="M7 2h2v1h2v1h2v1h2v1h1v2h-1v1h-2v1h-2v1H9v1H7v-1H5v-1H3V9H1V8H0V6h1V5h2V4h2V3h2z M7 4v1H5v1H3v1h1v1h2v1h1v1h2V9h2V8h2V7h1V6h-2V5H9V4z" fill="currentColor"/>
-            <rect x="7" y="5" width="2" height="1" fill="currentColor"/><rect x="5" y="6" width="2" height="1" fill="currentColor"/>
-            <rect x="9" y="8" width="2" height="1" fill="currentColor"/><rect x="7" y="9" width="2" height="1" fill="currentColor"/>
-          </svg>
-        </button>
-      </nav>
-
-      <div id="hint" class="wood" hidden>
-        <div class="inset" id="hint-text"></div>
-        <button class="btn btn-sm" id="hint-cancel" aria-label="Cancel tool" title="Cancel">
-          <svg viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
-            <path d="M3 2h2v1h1v1h1v1h2V4h1V3h1V2h2v2h-1v1h-1v1h-1v1h-1v2h1v1h1v1h1v1h1v2h-2v-1h-1v-1h-1v-1H9v-1H7v1H6v1H5v1H4v1H2v-2h1v-1h1v-1h1V9h1V7H5V6H4V5H3V4H2V2z" fill="currentColor"/>
-          </svg>
+      <div id="hint" hidden>
+        <span id="hint-text"></span>
+        <button id="hint-cancel" class="icon-btn" aria-label="Cancel tool">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
       </div>
 
-      <div id="tile-info" class="wood" hidden><div class="inset" id="tile-info-text"></div></div>
-      <div id="loading"><div class="wood loading-box"><div class="inset">GENERATING TERRAIN...</div></div></div>
+      <nav id="side-panel" aria-label="View controls">
+        <button class="fab" id="zoom-in" aria-label="Zoom in">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <button class="fab" id="zoom-out" aria-label="Zoom out">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
+        </button>
+        <button class="fab" id="zoom-reset" aria-label="Recenter map">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+        </button>
+        <button class="fab on" id="grid-toggle" aria-label="Toggle grid" aria-pressed="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5z"/><path d="M7.5 5.5l9 5M16.5 5.5l-9 5"/><path d="M3 13l9 5 9-5"/></svg>
+        </button>
+      </nav>
+
+      <div id="tile-info" class="card" hidden><div id="tile-info-text"></div></div>
+      <div id="loading"><div class="spinner"></div></div>
     </main>
 
     <!-- Construction toolbar -->
-    <footer id="toolbar" class="wood">
+    <footer id="toolbar">
       <div id="tray"><div id="tray-items"></div></div>
       <div id="tabs" role="tablist">
         <button class="tab" data-tab="terrain" role="tab">
-          <svg viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
-            <path d="M8 3h2v1h2v1h2v1h2v2h-2v1h-2v1h-2v1H8v-1H6V9H4V8H2V7H0V6h2V5h2V4h2V3z" fill="#5aa037"/>
-            <path d="M0 7h2v1h2v1h2v1h2v1h2v-1h2V9h2V8h2V7v2h-2v1h-2v1h-2v1H8v-1H6v-1H4V9H2V8H0z" fill="#6b4423"/>
-            <rect x="7" y="5" width="2" height="1" fill="#98c858"/><rect x="11" y="6" width="1" height="1" fill="#f1dc4f"/>
-          </svg>
-          <span>TERRAIN</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18l6-9 4 6 3-4 5 7z"/><circle cx="17" cy="6" r="2"/></svg>
+          <span>Terrain</span>
         </button>
         <button class="tab" data-tab="fences" role="tab">
-          <svg viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
-            <path d="M2 3h2v12H2zM7 2h2v13H7zM12 3h2v12h-2z" fill="#b8844a"/>
-            <path d="M1 6h14v2H1zM1 11h14v2H1z" fill="#8a5a2c"/>
-          </svg>
-          <span>FENCES</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V6l2-2 2 2v14M15 20V6l2-2 2 2v14M3 10h18M3 15h18"/></svg>
+          <span>Fences</span>
         </button>
         <button class="tab" data-tab="animals" role="tab">
-          <svg viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
-            <path d="M5 8h6v1h1v2h1v3h-1v1H9v-1H7v1H4v-1H3v-3h1V9h1z" fill="#e8b860"/>
-            <path d="M2 4h2v3H2zM5 1h2v4H5zM9 1h2v4H9zM12 4h2v3h-2z" fill="#e8b860"/>
-          </svg>
-          <span>ANIMALS</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="9" r="2"/><circle cx="10" cy="5.5" r="2"/><circle cx="14" cy="5.5" r="2"/><circle cx="18" cy="9" r="2"/><path d="M8 17.5c0-2.8 1.8-5.5 4-5.5s4 2.7 4 5.5c0 1.6-1.3 2.5-4 2.5s-4-.9-4-2.5z"/></svg>
+          <span>Animals</span>
         </button>
         <button class="tab" data-tab="staff" role="tab">
-          <svg viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
-            <rect x="3" y="1" width="6" height="1" fill="#c7b37a"/><rect x="2" y="2" width="8" height="1" fill="#c7b37a"/>
-            <rect x="4" y="3" width="4" height="3" fill="#e0ac69"/>
-            <rect x="3" y="7" width="6" height="5" fill="#9c8a4a"/>
-            <rect x="4" y="12" width="2" height="3" fill="#6b5e32"/><rect x="7" y="12" width="2" height="3" fill="#6b5e32"/>
-            <rect x="11" y="5" width="3" height="3" fill="#f1c27d"/><rect x="10" y="9" width="5" height="4" fill="#c0392b"/>
-            <rect x="11" y="13" width="1" height="2" fill="#2c3e70"/><rect x="13" y="13" width="1" height="2" fill="#2c3e70"/>
-          </svg>
-          <span>STAFF</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7.5" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><path d="M16 4.3a3.5 3.5 0 010 6.4M18 13.8c2 .9 3.5 3.1 3.5 5.7"/></svg>
+          <span>Staff</span>
         </button>
       </div>
     </footer>
