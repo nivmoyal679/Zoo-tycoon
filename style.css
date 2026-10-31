@@ -1,0 +1,156 @@
+/* ===== Retro Zoo Tycoon — base styles ===== */
+:root {
+  --wood-dark: #2b1d0e;
+  --wood: #5a3a1a;
+  --wood-light: #8b5a2b;
+  --bevel-hi: #c48a4a;
+  --bevel-lo: #1a1007;
+  --text: #fff4c2;
+  --cash: #7CFC00;
+  --date: #ffd34d;
+  --panel: #3b2712;
+  --font: "Press Start 2P", "Courier New", monospace;
+  --bar-h: 52px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #1b2a12;
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- Status bar ---------- */
+#status-bar {
+  flex: 0 0 auto;
+  height: calc(var(--bar-h) + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background:
+    repeating-linear-gradient(90deg, rgba(0,0,0,.08) 0 2px, transparent 2px 24px),
+    linear-gradient(var(--wood-light), var(--wood) 55%, var(--wood-dark));
+  border-bottom: 4px solid var(--bevel-lo);
+  box-shadow: inset 0 2px 0 var(--bevel-hi), 0 2px 0 rgba(0,0,0,.4);
+  z-index: 10;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 5px 8px;
+  min-width: 0;
+  background: #120b04;
+  border: 2px solid;
+  border-color: var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo); /* inset bevel */
+}
+
+.stat-label {
+  font-size: 7px;
+  color: #b89a6a;
+  letter-spacing: 1px;
+}
+
+.stat-value {
+  font-size: 11px;
+  white-space: nowrap;
+  text-shadow: 1px 1px 0 #000;
+}
+
+#cash-value { color: var(--cash); }
+#date-value { color: var(--date); }
+#stat-date { align-items: flex-end; }
+
+.title {
+  font-size: 10px;
+  color: var(--text);
+  text-shadow: 2px 2px 0 #000;
+  letter-spacing: 1px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Hide the title on narrow phones so the stats always fit */
+@media (max-width: 400px) {
+  .title { display: none; }
+}
+
+/* ---------- Map viewport ---------- */
+#viewport {
+  position: relative;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none; /* we handle all gestures ourselves */
+  cursor: grab;
+  image-rendering: pixelated;
+}
+#game.dragging { cursor: grabbing; }
+
+/* ---------- Zoom buttons ---------- */
+#zoom-controls {
+  position: absolute;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.btn {
+  width: 48px;
+  height: 48px;
+  font-family: var(--font);
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text);
+  background: var(--wood);
+  border: 3px solid;
+  border-color: var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi); /* outset bevel */
+  box-shadow: 2px 2px 0 rgba(0,0,0,.5);
+  text-shadow: 1px 1px 0 #000;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.btn:active {
+  border-color: var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);
+  transform: translate(1px, 1px);
+  box-shadow: none;
+}
+
+/* ---------- Tile info toast ---------- */
+#tile-info {
+  position: absolute;
+  left: max(12px, env(safe-area-inset-left));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  padding: 8px 10px;
+  font-size: 8px;
+  line-height: 1.6;
+  background: rgba(18, 11, 4, .88);
+  border: 2px solid var(--bevel-hi);
+  pointer-events: none;
+}
