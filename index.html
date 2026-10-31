@@ -49,7 +49,7 @@
       <button class="orb" id="rot-left" aria-label="Rotate left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 107.5-7.5H8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M10 1.5L6.5 4.5 10 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <button class="orb" id="rot-right" aria-label="Rotate right"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12A7.5 7.5 0 1112 4.5h4" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M14 1.5l3.5 3L14 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <button class="orb" id="zoom-reset" aria-label="Recenter"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" stroke-width="2.4"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/><path d="M12 2v3.5M12 18.5V22M2 12h3.5M18.5 12H22" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
-      <button class="orb on" id="grid-toggle" aria-label="Toggle grid" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM4 9.3h16M4 14.6h16M9.3 4v16M14.6 4v16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>
+      <button class="orb" id="grid-toggle" aria-label="Toggle grid" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM4 9.3h16M4 14.6h16M9.3 4v16M14.6 4v16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>
     </nav>
 
     <div id="tile-info" class="glass" hidden><div id="tile-info-text"></div></div>
@@ -81,7 +81,9 @@
   </div>
 
   <script src="vendor/three.min.js"></script>
+  <script src="vendor/three-addons.min.js"></script>
   <script src="terrain.js"></script>
+  <script src="textures.js"></script>
   <script src="models.js"></script>
   <script src="main.js"></script>
 </body>

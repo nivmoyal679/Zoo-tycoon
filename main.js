@@ -213,34 +213,77 @@
   // =========================================================
   // Three.js scene
   // =========================================================
+  const IS_MOBILE = matchMedia('(pointer: coarse)').matches;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, IS_MOBILE ? 1.75 : 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 0.62;
 
   const scene = new THREE.Scene();
-  const SKY = new THREE.Color('#a9c9de');
-  scene.background = SKY;
-  scene.fog = new THREE.Fog(SKY, 45, 130);
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 2000);
 
-  const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 500);
+  // ---- Physical sky (atmospheric scattering) + image-based lighting from it ----
+  const SUN_DIR = new THREE.Vector3(0.55, 0.62, 0.32).normalize();
+  const HAZE = new THREE.Color('#b9c8cf');
+  function makeSky() {
+    const sky = new THREE_ADDONS.Sky();
+    sky.scale.setScalar(1500);
+    const u = sky.material.uniforms;
+    u.turbidity.value = 5.5;
+    u.rayleigh.value = 1.4;
+    u.mieCoefficient.value = 0.004;
+    u.mieDirectionalG.value = 0.8;
+    u.sunPosition.value.copy(SUN_DIR);
+    return sky;
+  }
+  scene.add(makeSky());
+  {
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const envScene = new THREE.Scene();
+    envScene.add(makeSky());
+    scene.environment = pmrem.fromScene(envScene, 0.02).texture;
+    scene.environmentIntensity = 1;
+    pmrem.dispose();
+  }
+  scene.fog = new THREE.FogExp2(HAZE, 0.011);
 
-  scene.add(new THREE.HemisphereLight('#eef6ff', '#5b7040', 1.5));
-  const sun = new THREE.DirectionalLight('#fff1d8', 2.7);
+  const sun = new THREE.DirectionalLight('#fff0d6', 4.2);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.bias = -0.0004;
-  sun.shadow.normalBias = 0.03;
+  sun.shadow.bias = -0.0003;
+  sun.shadow.normalBias = 0.025;
   scene.add(sun, sun.target);
-  const SUN_DIR = new THREE.Vector3(0.5, 1, 0.28).normalize();
+  scene.add(new THREE.HemisphereLight('#dfeaf5', '#4a5a34', 0.35));
 
-  // ---- Ground (painted texture + dug lakes) ----
+  const timeUniforms = { uTime: { value: 0 } };
+
+  // ---- Ground: painted macro texture x tiling detail texture + detail normals ----
+  const DETAIL = Zoo.textures.groundDetail();
+  function detailMaterial(map, normalRepeat, detailRepeat) {
+    const detail = M.tex(DETAIL.map, 1, 1, false);
+    const normal = M.tex(DETAIL.normal, normalRepeat, normalRepeat, false);
+    const mat = new THREE.MeshStandardMaterial({ map, normalMap: normal, normalScale: new THREE.Vector2(0.9, 0.9), roughness: 0.97 });
+    mat.onBeforeCompile = sh => {
+      sh.uniforms.detailMap = { value: detail };
+      sh.uniforms.detailRepeat = { value: detailRepeat };
+      sh.fragmentShader = 'uniform sampler2D detailMap;\nuniform float detailRepeat;\n' + sh.fragmentShader.replace('#include <map_fragment>', `
+        #include <map_fragment>
+        vec3 det = texture2D(detailMap, vMapUv * detailRepeat).rgb;
+        vec3 det2 = texture2D(detailMap, vMapUv * detailRepeat * 0.23 + 0.37).rgb;
+        diffuseColor.rgb *= det * 2.0 * mix(0.85, 1.15, det2.r);
+      `);
+    };
+    return mat;
+  }
+
   const groundGeo = new THREE.PlaneGeometry(N, N, N * 2, N * 2);
   groundGeo.rotateX(-Math.PI / 2);
   const groundTex = new THREE.CanvasTexture(TR.texCanvas);
   groundTex.colorSpace = THREE.SRGBColorSpace;
   groundTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  const ground = new THREE.Mesh(groundGeo, new THREE.MeshStandardMaterial({ map: groundTex, roughness: 0.96 }));
+  const ground = new THREE.Mesh(groundGeo, detailMaterial(groundTex, N * 1.5, N * 1.5));
   ground.receiveShadow = true;
   scene.add(ground);
 
@@ -252,21 +295,26 @@
     groundGeo.computeVertexNormals();
   }
 
+  // ---- Water: reflects the sky, rippling normals ----
+  const waterNormal = M.tex(Zoo.textures.waterNormal(), N / 3, N / 3, false);
   const water = new THREE.Mesh(
     new THREE.PlaneGeometry(N, N).rotateX(-Math.PI / 2),
-    new THREE.MeshStandardMaterial({ color: '#3b7fa8', transparent: true, opacity: 0.8, roughness: 0.1, metalness: 0.15 }));
-  water.position.y = -0.1;
+    new THREE.MeshStandardMaterial({
+      color: '#24495a', roughness: 0.04, metalness: 0.05, transparent: true, opacity: 0.88,
+      normalMap: waterNormal, normalScale: new THREE.Vector2(0.45, 0.45), envMapIntensity: 1.3,
+    }));
+  water.position.y = -0.11;
   water.receiveShadow = true;
   scene.add(water);
 
-  // ---- Land outside the zoo (a frame around the map, so lakes aren't covered) ----
+  // ---- Land outside the zoo, road, kerb, gate, trees ----
   (function buildSurroundings() {
     const tex = new THREE.CanvasTexture(TR.outsideTexture());
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
     tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-    const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 1 });
-    const E = 170;
+    const mat = detailMaterial(tex, 10.5, 10.5); // uv = world / 7 -> same detail density as the zoo grounds
+    const E = 400;
     const rect = (x0, z0, x1, z1) => {
       const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0).rotateX(-Math.PI / 2);
       g.translate((x0 + x1) / 2, 0, (z0 + z1) / 2);
@@ -282,15 +330,14 @@
     rect(-E, -HALF, -HALF, HALF);
     rect(HALF, -HALF, E, HALF);
 
-    // Access road to the gate
-    const road = new THREE.Mesh(new THREE.PlaneGeometry(2, 40).rotateX(-Math.PI / 2),
-      new THREE.MeshStandardMaterial({ color: '#4a4c50', roughness: 0.92 }));
-    road.position.set(0, 0.003, HALF + 20);
+    const asphalt = new THREE.CanvasTexture(TR.swatch(T.PATH, 128));
+    asphalt.colorSpace = THREE.SRGBColorSpace;
+    const road = new THREE.Mesh(new THREE.PlaneGeometry(2, 60).rotateX(-Math.PI / 2), detailMaterial(asphalt, 20, 20));
+    road.position.set(0, 0.003, HALF + 30);
     road.receiveShadow = true;
     scene.add(road);
 
-    // Low stone kerb around the zoo grounds (gap at the entrance)
-    const kerbMat = new THREE.MeshStandardMaterial({ color: '#c3beb0', roughness: 0.9 });
+    const kerbMat = new THREE.MeshStandardMaterial({ color: '#b9b4a6', roughness: 0.9 });
     const kerb = (w, d, x, z) => {
       const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.08, d), kerbMat);
       m.position.set(x, 0.04, z);
@@ -303,70 +350,109 @@
     kerb(HALF - 1, 0.08, -(HALF + 1) / 2, HALF);
     kerb(HALF - 1, 0.08, (HALF + 1) / 2, HALF);
 
-    // Entrance gate
-    const stone = new THREE.MeshStandardMaterial({ color: '#e3dccb', roughness: 0.85 });
-    const green = new THREE.MeshStandardMaterial({ color: '#3d6a33', roughness: 0.7 });
+    // Entrance gate: stone pillars, timber beam, carved sign
+    const stone = new THREE.MeshStandardMaterial({ color: '#cfc6b1', roughness: 0.9, normalMap: M.tex(DETAIL.normal, 1, 3, false) });
+    const timber = new THREE.MeshStandardMaterial({ color: '#7a5434', roughness: 0.85, map: M.tex(Zoo.textures.woodGrain(), 3, 1) });
     for (const s of [-1, 1]) {
-      const p = new THREE.Mesh(new THREE.BoxGeometry(0.24, 1.35, 0.24), stone);
-      p.position.set(1.14 * s, 0.675, HALF);
+      const p = new THREE.Mesh(new THREE.BoxGeometry(0.28, 1.45, 0.28), stone);
+      p.position.set(1.16 * s, 0.725, HALF);
       p.castShadow = p.receiveShadow = true;
       scene.add(p);
-      const cap = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.08, 0.32), stone);
-      cap.position.set(1.14 * s, 1.39, HALF);
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.08, 0.36), stone);
+      cap.position.set(1.16 * s, 1.49, HALF);
       cap.castShadow = true;
       scene.add(cap);
     }
-    const beam = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.3, 0.14), green);
-    beam.position.set(0, 1.2, HALF);
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.32, 0.16), timber);
+    beam.position.set(0, 1.25, HALF);
     beam.castShadow = true;
     scene.add(beam);
     const sc = document.createElement('canvas');
     sc.width = 512; sc.height = 64;
     const g = sc.getContext('2d');
-    g.fillStyle = '#3d6a33'; g.fillRect(0, 0, 512, 64);
-    g.fillStyle = '#f6e7b0'; g.font = '800 40px Inter, system-ui, sans-serif';
+    g.drawImage(Zoo.textures.woodGrain(), 0, 0, 512, 64);
+    g.globalCompositeOperation = 'multiply';
+    g.fillStyle = '#7a5434'; g.fillRect(0, 0, 512, 64);
+    g.globalCompositeOperation = 'source-over';
+    g.fillStyle = '#f1e2b8'; g.font = '800 40px Georgia, serif';
     g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText('ZOO', 256, 34);
+    g.fillText('Z O O', 256, 34);
     const signTex = new THREE.CanvasTexture(sc);
     signTex.colorSpace = THREE.SRGBColorSpace;
     for (const s of [1, -1]) {
-      const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 0.28), new THREE.MeshBasicMaterial({ map: signTex }));
-      sign.position.set(0, 1.2, HALF + 0.075 * s);
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.3), new THREE.MeshStandardMaterial({ map: signTex, roughness: 0.8 }));
+      sign.position.set(0, 1.25, HALF + 0.081 * s);
       if (s < 0) sign.rotation.y = Math.PI;
       scene.add(sign);
     }
 
-    // Trees & bushes on the land around the zoo
+    // Woodland around the zoo
     const rng = TR.mulberry32(77);
     const trees = [], bushes = [];
     let guard = 0;
-    while (trees.length < 200 && guard++ < 5000) {
-      const x = (rng() * 2 - 1) * (HALF + 18), z = (rng() * 2 - 1) * (HALF + 18);
-      if (Math.abs(x) < HALF + 1 && Math.abs(z) < HALF + 1) continue;
-      if (Math.abs(x) < 2.5 && z > HALF) continue;
-      trees.push({ x, z, scale: 0.8 + rng() * 0.7 });
+    const treeCount = IS_MOBILE ? 170 : 260;
+    while (trees.length < treeCount && guard++ < 8000) {
+      const x = (rng() * 2 - 1) * (HALF + 26), z = (rng() * 2 - 1) * (HALF + 26);
+      if (Math.abs(x) < HALF + 1.2 && Math.abs(z) < HALF + 1.2) continue;
+      if (Math.abs(x) < 3 && z > HALF) continue;
+      trees.push({ x, z, scale: 0.85 + rng() * 0.75, pine: rng() < 0.28 });
     }
     guard = 0;
-    while (bushes.length < 90 && guard++ < 5000) {
-      const side = Math.floor(rng() * 4), t = (rng() * 2 - 1) * HALF, off = HALF + 0.5 + rng() * 2;
+    while (bushes.length < 140 && guard++ < 6000) {
+      const side = Math.floor(rng() * 4), t = (rng() * 2 - 1) * HALF, off = HALF + 0.6 + rng() * 2.5;
       const x = side < 2 ? t : (side === 2 ? -off : off), z = side < 2 ? (side === 0 ? -off : off) : t;
-      if (Math.abs(x) < 2.5 && z > HALF) continue;
+      if (Math.abs(x) < 3 && z > HALF) continue;
       bushes.push({ x, z });
     }
-    const leafMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, flatShading: true });
-    const treeMesh = new THREE.Mesh(M.treesGeometry(trees, rng), leafMat);
-    treeMesh.castShadow = treeMesh.receiveShadow = true;
-    scene.add(treeMesh);
+    const tg = M.treesGeometry(trees, rng);
+    const trunks = new THREE.Mesh(tg.trunks, M.BARK_MAT);
+    trunks.castShadow = trunks.receiveShadow = true;
+    const leafMat = M.LEAF_MAT;
+    M.addWind(leafMat, timeUniforms, 0.012);
+    const crowns = new THREE.Mesh(tg.leaves, leafMat);
+    crowns.castShadow = crowns.receiveShadow = true;
+    crowns.customDepthMaterial = M.LEAF_DEPTH;
     const bushMesh = new THREE.Mesh(M.bushesGeometry(bushes, rng), leafMat);
     bushMesh.castShadow = bushMesh.receiveShadow = true;
-    scene.add(bushMesh);
+    bushMesh.customDepthMaterial = M.LEAF_DEPTH;
+    scene.add(trunks, crowns, bushMesh);
   })();
 
-  // ---- Grid lines (skipped over water so they never float) ----
-  const gridMat = new THREE.LineBasicMaterial({ color: '#0c1a07', transparent: true, opacity: 0.16, depthWrite: false });
+  // ---- Grass tufts (instanced, swaying) on grass tiles ----
+  const TUFTS_PER_TILE = IS_MOBILE ? 16 : 28;
+  M.addWind(M.TUFT_MAT, timeUniforms, 0.09, [7, 15]); // tufts only near the camera
+  const tuftGeo = M.tuftGeometry();
+  let tufts = null;
+  function rebuildTufts() {
+    if (tufts) { scene.remove(tufts); tufts.dispose(); }
+    const spots = [];
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      if (tileAt(x, y) !== T.GRASS) continue;
+      for (let k = 0; k < TUFTS_PER_TILE; k++) spots.push([x, y, k]);
+    }
+    tufts = new THREE.InstancedMesh(tuftGeo, M.TUFT_MAT, spots.length);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), s = new THREE.Vector3(), c = new THREE.Color();
+    spots.forEach(([x, y, k], i) => {
+      const h1 = TR.hash(x * 31 + k, y * 17 + 3), h2 = TR.hash(x * 7 + 11, y * 13 + k), h3 = TR.hash(x + k * 5, y * 3 + 1);
+      p.set(x + 0.08 + h1 * 0.84 - HALF, 0, y + 0.08 + h2 * 0.84 - HALF);
+      e.set(0, h3 * Math.PI, 0); q.setFromEuler(e);
+      const sz = 0.075 + h1 * 0.07;
+      s.set(sz * 1.4, sz * (0.7 + h2 * 0.6), sz * 1.4);
+      m.compose(p, q, s);
+      tufts.setMatrixAt(i, m);
+      c.setRGB(0.74 + h3 * 0.22, 0.78 + h1 * 0.2, 0.64 + h2 * 0.16);
+      tufts.setColorAt(i, c);
+    });
+    tufts.receiveShadow = true;
+    scene.add(tufts);
+  }
+
+  // ---- Grid lines (shown while building; skipped over water) ----
+  const gridMat = new THREE.LineBasicMaterial({ color: '#0c1a07', transparent: true, opacity: 0.22, depthWrite: false });
   const gridLines = new THREE.LineSegments(new THREE.BufferGeometry(), gridMat);
   gridLines.renderOrder = 1;
   scene.add(gridLines);
+  let gridOn = false;
   function rebuildGrid() {
     const pts = [];
     const land = (x, y) => !isWater(x, y);
@@ -382,28 +468,37 @@
     gridLines.geometry.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
   }
 
-  // ---- Fences ----
-  const fenceMesh = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75 }));
-  fenceMesh.castShadow = fenceMesh.receiveShadow = true;
-  scene.add(fenceMesh);
+  // ---- Fences: one mesh per material ----
+  function fencePair(ghost) {
+    const mk = base => {
+      const mat = ghost ? base.clone() : base;
+      if (ghost) { mat.transparent = true; mat.opacity = 0.5; mat.depthWrite = false; }
+      const m = new THREE.Mesh(new THREE.BufferGeometry(), mat);
+      m.castShadow = !ghost; m.receiveShadow = true;
+      scene.add(m);
+      return m;
+    };
+    const pair = { wood: mk(M.FENCE_MATS.wood), iron: mk(M.FENCE_MATS.iron) };
+    pair.set = geos => { for (const k of ['wood', 'iron']) { pair[k].geometry.dispose(); pair[k].geometry = geos[k]; } };
+    pair.show = v => { pair.wood.visible = pair.iron.visible = v; };
+    return pair;
+  }
+  const fences = fencePair(false);
   function rebuildFenceMesh() {
     const { segs, posts } = fenceParts(allFenceEdges());
-    fenceMesh.geometry.dispose();
-    fenceMesh.geometry = M.fenceGeometry(segs, posts);
+    fences.set(M.fenceGeometry(segs, posts));
   }
-  const ghostFence = new THREE.Mesh(new THREE.BufferGeometry(),
-    new THREE.MeshStandardMaterial({ vertexColors: true, transparent: true, opacity: 0.5, depthWrite: false }));
-  ghostFence.visible = false;
-  scene.add(ghostFence);
+  const ghostFence = fencePair(true);
+  ghostFence.show(false);
   let ghostKey = '';
 
   // ---- Highlight helpers ----
   function makeArea() {
     const fill = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.3, depthWrite: false }));
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.3, depthWrite: false, toneMapped: false }));
     const edgeGeo = new THREE.BufferGeometry();
     edgeGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Array(15).fill(0), 3));
-    const edge = new THREE.Line(edgeGeo, new THREE.LineBasicMaterial({ transparent: true, depthWrite: false }));
+    const edge = new THREE.Line(edgeGeo, new THREE.LineBasicMaterial({ transparent: true, depthWrite: false, toneMapped: false }));
     fill.renderOrder = edge.renderOrder = 2;
     fill.visible = edge.visible = false;
     scene.add(fill, edge);
@@ -411,7 +506,7 @@
       show(a, b, color, opacity) {
         const x0 = Math.min(a.x, b.x) - HALF, x1 = Math.max(a.x, b.x) + 1 - HALF;
         const z0 = Math.min(a.y, b.y) - HALF, z1 = Math.max(a.y, b.y) + 1 - HALF;
-        const y = 0.03;
+        const y = 0.06;
         fill.position.set((x0 + x1) / 2, y, (z0 + z1) / 2);
         fill.scale.set(x1 - x0, 1, z1 - z0);
         fill.material.color.set(color);
@@ -430,7 +525,7 @@
   const hoverArea = makeArea();
 
   function makeMarker(color) {
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.06, 24), new THREE.MeshBasicMaterial({ color }));
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.06, 24), new THREE.MeshBasicMaterial({ color, toneMapped: false }));
     m.visible = false;
     m.renderOrder = 3;
     scene.add(m);
@@ -440,7 +535,7 @@
   const hoverMarker = makeMarker('#ffffff');
 
   const selRing = new THREE.Mesh(new THREE.RingGeometry(0.82, 1, 48).rotateX(-Math.PI / 2),
-    new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.95, depthWrite: false }));
+    new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.95, depthWrite: false, toneMapped: false }));
   selRing.visible = false;
   selRing.renderOrder = 2;
   scene.add(selRing);
@@ -463,6 +558,7 @@
     groundTex.needsUpdate = true;
     updateHeights();
     rebuildGrid();
+    rebuildTufts();
   }
 
   // =========================================================
@@ -472,7 +568,7 @@
   let viewW = 1, viewH = 1, odpr = 1;
   let camAnim = null;
 
-  const pitchFor = d => 0.56 + ((d - MIN_DIST) / (MAX_DIST - MIN_DIST)) * 0.5; // ~32° close .. ~61° far
+  const pitchFor = d => 0.42 + ((d - MIN_DIST) / (MAX_DIST - MIN_DIST)) * 0.6; // ~24° close .. ~58° far
 
   function updateCamera() {
     const lim = HALF + 2;
@@ -573,8 +669,8 @@
       ...extra,
     };
     if (kind === 'animal') e.model = M.createAnimal(e.species);
-    else if (kind === 'keeper') e.model = M.createPerson(M.KEEPER_LOOK, true);
-    else e.model = M.createPerson(e.look, false); // guests skip shadows to stay fast
+    else if (kind === 'keeper') e.model = M.createPerson(M.KEEPER_LOOK, true, true);
+    else e.model = M.createPerson(e.look, false, false); // guests skip shadows to stay fast
     e.model.root.userData.entity = e;
     scene.add(e.model.root);
     syncEntity(e, 0);
@@ -599,7 +695,7 @@
       e.heading += d * Math.min(1, dt * 9);
     }
     r.rotation.y = e.heading;
-    M.animate(e.model, Math.sin(e.anim * 1.7), e.moving);
+    M.animate(e.model, (e.anim / e.model.stride) * Math.PI * 2, e.moving, dt);
   }
 
   function stepToward(e, speed, dt) {
@@ -608,7 +704,7 @@
     const step = speed * dt;
     if (d > 1e-4) { e.dirX = dx; e.dirZ = dy; }
     e.moving = true;
-    e.anim += step * 7;
+    e.anim += step; // distance walked drives the gait phase
     if (d <= step) { e.fx = e.tgt.x; e.fy = e.tgt.y; e.tgt = null; return true; }
     e.fx += (dx / d) * step;
     e.fy += (dy / d) * step;
@@ -1044,7 +1140,7 @@
   document.addEventListener('contextmenu', e => e.preventDefault());
 
   function setGrid(on) {
-    gridLines.visible = on;
+    gridOn = on;
     gridBtn.classList.toggle('on', on);
     gridBtn.setAttribute('aria-pressed', String(on));
     dirty = true;
@@ -1060,7 +1156,7 @@
   $('rot-left').addEventListener('click', () => animateCam({ yaw: cam.yaw + Math.PI / 4 }));
   $('rot-right').addEventListener('click', () => animateCam({ yaw: cam.yaw - Math.PI / 4 }));
   $('zoom-reset').addEventListener('click', () => animateCam({ ...HOME, yaw: HOME.yaw + Math.round((cam.yaw - HOME.yaw) / (Math.PI * 2)) * Math.PI * 2 }));
-  gridBtn.addEventListener('click', () => setGrid(!gridLines.visible));
+  gridBtn.addEventListener('click', () => setGrid(!gridOn));
   pauseBtn.addEventListener('click', () => setPaused(!state.paused));
 
   window.addEventListener('keydown', e => {
@@ -1075,7 +1171,7 @@
     else if (k === 'e') return animateCam({ yaw: cam.yaw - Math.PI / 4 });
     else if (k === '+' || k === '=') return animateCam({ dist: clamp(cam.dist / 1.4, MIN_DIST, MAX_DIST) });
     else if (k === '-') return animateCam({ dist: clamp(cam.dist * 1.4, MIN_DIST, MAX_DIST) });
-    else if (k === 'g') return setGrid(!gridLines.visible);
+    else if (k === 'g') return setGrid(!gridOn);
     else if (k === 'p' || k === ' ') return setPaused(!state.paused);
     else if (k === 'Escape') return selectTool(null);
     else return;
@@ -1094,7 +1190,9 @@
     if (!tool && hoverTile && !selectedEntity) hoverArea.show(hoverTile, hoverTile, '#ffffff', 0.12); else hoverArea.hide();
 
     toolArea.hide();
-    ghostFence.visible = false;
+    ghostFence.show(false);
+    // Grid appears automatically while placing terrain or fences
+    gridLines.visible = gridOn || (!!tool && (tool.kind === 'fence' || tool.kind === 'terrain'));
     pendingMarker.visible = hoverMarker.visible = false;
     if (tool) {
       if (tool.kind === 'terrain') {
@@ -1117,10 +1215,9 @@
             ghostKey = key;
             const edges = fenceEdgesFor(pending.a, hoverCorner).map(e => ({ ...e, type: tool.fence }));
             const { segs, posts } = fenceParts(edges);
-            ghostFence.geometry.dispose();
-            ghostFence.geometry = M.fenceGeometry(segs, posts);
+            ghostFence.set(M.fenceGeometry(segs, posts));
           }
-          ghostFence.visible = true;
+          ghostFence.show(true);
         }
       } else if (hoverTile && (tool.kind === 'animal' || tool.kind === 'staff')) {
         const ok = tileAt(hoverTile.x, hoverTile.y) !== T.WATER && (tool.kind === 'staff' || isEnclosed(hoverTile.x, hoverTile.y));
@@ -1226,9 +1323,11 @@
     } catch (err) { return; }
     r.setSize(W, H, false);
     r.setClearColor(0x000000, 0);
+    r.toneMapping = THREE.ACESFilmicToneMapping;
+    r.toneMappingExposure = 0.9;
     const sc = new THREE.Scene();
-    sc.add(new THREE.HemisphereLight('#ffffff', '#6b7a5a', 1.8));
-    const dl = new THREE.DirectionalLight('#ffffff', 2.4);
+    sc.add(new THREE.HemisphereLight('#ffffff', '#6b7a5a', 1.6));
+    const dl = new THREE.DirectionalLight('#fff4e0', 3.2);
     dl.position.set(3, 5, 4);
     sc.add(dl);
     const c = new THREE.PerspectiveCamera(28, W / H, 0.01, 100);
@@ -1243,20 +1342,31 @@
       return url;
     };
     const V = (x, y, z) => new THREE.Vector3(x, y, z);
-    ICONS.lion = shoot(M.createAnimal('lion').root, 0.48, V(0, 0.27, 0));
-    ICONS.elephant = shoot(M.createAnimal('elephant').root, 0.78, V(0.05, 0.5, 0));
-    ICONS.zebra = shoot(M.createAnimal('zebra').root, 0.55, V(0.03, 0.42, 0));
-    ICONS.keeper = shoot(M.createPerson(M.KEEPER_LOOK).root, 0.3, V(0, 0.22, 0));
+    const iconOf = (model, sizeMul = 1) => {
+      if (model.mixer) { // loaded GLB: frame by its normalised height
+        model.mixer.update(0);
+        return shoot(model.root, model.height * 0.8 * sizeMul, V(0, model.height * 0.5, 0));
+      }
+      model.root.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(model.root);
+      const ctr = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
+      return shoot(model.root, Math.max(sz.x, sz.y, sz.z) * 0.62 * sizeMul, ctr);
+    };
+    ICONS.lion = iconOf(M.createAnimal('lion'));
+    ICONS.elephant = iconOf(M.createAnimal('elephant'));
+    ICONS.zebra = iconOf(M.createAnimal('zebra'));
+    ICONS.keeper = iconOf(M.createPerson(M.KEEPER_LOOK, true, true), 1.1);
     for (const [id, type] of [['wood', 1], ['iron', 2]]) {
-      const { segs, posts } = fenceParts([{ o: 'h', x: 0, y: 1, type }, { o: 'v', x: 1, y: 0, type }].map(e => ({ ...e })));
+      const { segs, posts } = fenceParts([{ o: 'h', x: 0, y: 1, type }, { o: 'v', x: 1, y: 0, type }]);
       // fenceParts offsets by HALF; shift back to the origin for the icon
-      const m = new THREE.Mesh(M.fenceGeometry(
+      const geos = M.fenceGeometry(
         segs.map(s => ({ ...s, x: s.x + HALF - 1, z: s.z + HALF - 1 })),
-        posts.map(p => ({ ...p, x: p.x + HALF - 1, z: p.z + HALF - 1 }))),
-        new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75 }));
-      ICONS[id] = shoot(m, 0.75, V(-0.1, 0.3, -0.2));
+        posts.map(p => ({ ...p, x: p.x + HALF - 1, z: p.z + HALF - 1 })));
+      const grp = new THREE.Group();
+      grp.add(new THREE.Mesh(geos.wood, M.FENCE_MATS.wood), new THREE.Mesh(geos.iron, M.FENCE_MATS.iron));
+      ICONS[id] = shoot(grp, 0.75, V(-0.1, 0.3, -0.2));
     }
-    const side = new THREE.MeshStandardMaterial({ color: '#7a5a3a', roughness: 1 });
+    const side = new THREE.MeshStandardMaterial({ color: '#6e5238', roughness: 1 });
     for (const [id, t] of [['grass', T.GRASS], ['dirt', T.DIRT], ['water', T.WATER], ['path', T.PATH]]) {
       const tex = new THREE.CanvasTexture(TR.swatch(t));
       tex.colorSpace = THREE.SRGBColorSpace;
@@ -1266,6 +1376,31 @@
     }
     r.dispose();
     if (r.forceContextLoss) r.forceContextLoss();
+  }
+
+  /** Optional drop-in models: models/<name>.glb (+ optional models/manifest.json). Needs http(s). */
+  async function loadCustomModels() {
+    if (!/^https?:/.test(location.protocol) || !window.THREE_ADDONS) return [];
+    let manifest = null;
+    try {
+      const r = await fetch('models/manifest.json', { cache: 'no-store' });
+      if (r.ok) manifest = await r.json();
+    } catch (e) { /* no manifest */ }
+    const keys = ['lion', 'elephant', 'zebra', 'keeper', 'guest'];
+    const jobs = keys.map(async k => {
+      const cfg = (manifest && manifest[k]) || {};
+      const url = 'models/' + (cfg.file || k + '.glb');
+      try {
+        const head = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+        if (!head.ok) return null;
+        await M.loadGLB(k, url, cfg);
+        return k;
+      } catch (e) {
+        console.warn('Could not load model', url, e);
+        return null;
+      }
+    });
+    return (await Promise.all(jobs)).filter(Boolean);
   }
 
   // =========================================================
@@ -1310,12 +1445,13 @@
       if (el) el.textContent = gc;
     }
 
-    if (dirty || entities.length || floats.length || pending || selectedEntity) {
-      const { hoverCorner } = updateHighlights(now);
-      renderer.render(scene, camera);
-      drawLabels(now, hoverCorner);
-      dirty = false;
-    }
+    // Living scene (wind, water, animals) -> render every frame
+    timeUniforms.uTime.value = now / 1000;
+    waterNormal.offset.set((now / 1000) * 0.012, (now / 1000) * 0.007);
+    const { hoverCorner } = updateHighlights(now);
+    renderer.render(scene, camera);
+    drawLabels(now, hoverCorner);
+    dirty = false;
     requestAnimationFrame(frame);
   }
 
@@ -1326,8 +1462,9 @@
   window.addEventListener('resize', resize);
   window.addEventListener('orientationchange', () => setTimeout(resize, 150));
 
-  requestAnimationFrame(() => setTimeout(() => {
+  requestAnimationFrame(() => setTimeout(async () => {
     const t0 = performance.now();
+    const custom = await loadCustomModels();
     TR.paint();
     terrainChanged();
     worldChanged();
@@ -1335,8 +1472,8 @@
     setTab('fences');
     resize();
     updateHUD();
-    setGrid(true);
-    console.log(`World built in ${Math.round(performance.now() - t0)} ms`);
+    setGrid(false);
+    console.log(`World built in ${Math.round(performance.now() - t0)} ms` + (custom.length ? ` (custom models: ${custom.join(', ')})` : ''));
     loadingEl.hidden = true;
     flash('Build a fenced enclosure, then add animals!', 'good', 5000);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { dirty = true; });

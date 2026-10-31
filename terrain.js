@@ -109,7 +109,7 @@
     let t = big * 0.55 + mid * 0.3 + fine * 0.15;
     t = Math.min(1, Math.max(0, (t - 0.5) * 1.5 + 0.5));
     const blade = hash(px >> 1, (py / 3) | 0) > 0.93 ? 0.08 : 0;
-    return [mix(62, 132, t) + blade * 200, mix(104, 170, t) + blade * 180, mix(36, 66, t)];
+    return [mix(58, 118, t) + blade * 160, mix(86, 146, t) + blade * 150, mix(34, 60, t)];
   }
 
   function dirt(px, py) {
@@ -203,7 +203,7 @@
     for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
       let t = tile(x / 32, y / 32, 8) * 0.6 + tile(x / 8, y / 8, 32) * 0.25 + hash(x + 999, y) * 0.15;
       t = (t - 0.5) * 1.4 + 0.5;
-      img.data.set([mix(40, 84, t), mix(66, 110, t), mix(30, 50, t), 255], (y * S + x) * 4);
+      img.data.set([mix(38, 78, t), mix(56, 98, t), mix(28, 46, t), 255], (y * S + x) * 4);
     }
     g.putImageData(img, 0, 0);
     return c;
